@@ -4,7 +4,7 @@
 //
 // The MIT License (MIT)
 //
-// Copyright (C) 2000-2025 Ake Hedman, the VSCP project <info@vscp.org>
+// Copyright (C) 2000-2024 Ake Hedman, the VSCP project <info@vscp.org>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -1035,7 +1035,7 @@ vscp_getDeviceInfoHtml(CMDF &mdf, CStandardRegisters &stdregs)
 
     html += "<br><b>Pictures</b><ul>";
 
-    for (size_t i = 0; i < mdf.getPictureCount(); i++) {
+    for (unsigned i = 0; i < mdf.getPictureCount(); i++) {
       html += "<li><a href=\"";
       html += mdf.getPictureObj(i)->getUrl();
       html += "\">";
@@ -1056,7 +1056,7 @@ vscp_getDeviceInfoHtml(CMDF &mdf, CStandardRegisters &stdregs)
 
     html += "<br><b>Videos</b><ul>";
 
-    for (size_t i = 0; i < mdf.getVideoCount(); i++) {
+    for (unsigned i = 0; i < mdf.getVideoCount(); i++) {
       html += "<li><a href=\"";
       html += mdf.getVideoObj(i)->getUrl();
       html += "\">";
@@ -1077,7 +1077,7 @@ vscp_getDeviceInfoHtml(CMDF &mdf, CStandardRegisters &stdregs)
 
     html += "<br><b>Firmware</b><ul>";
 
-    for (size_t i = 0; i < mdf.getFirmwareCount(); i++) {
+    for (unsigned i = 0; i < mdf.getFirmwareCount(); i++) {
       html += "<li><a href=\"";
       html += mdf.getFirmwareObj(i)->getUrl();
       html += "\">";
@@ -1098,7 +1098,7 @@ vscp_getDeviceInfoHtml(CMDF &mdf, CStandardRegisters &stdregs)
 
     html += "<br><b>Drivers</b><ul>";
 
-    for (size_t i = 0; i < mdf.getDriverCount(); i++) {
+    for (unsigned i = 0; i < mdf.getDriverCount(); i++) {
       html += "<li><a href=\"";
       html += mdf.getDriverObj(i)->getUrl();
       html += "\">";
@@ -1119,7 +1119,7 @@ vscp_getDeviceInfoHtml(CMDF &mdf, CStandardRegisters &stdregs)
 
     html += "<br><b>Manuals</b><ul>";
 
-    for (size_t i = 0; i < mdf.getManualCount(); i++) {
+    for (unsigned i = 0; i < mdf.getManualCount(); i++) {
       html += "<li><a href=\"";
       html += mdf.getManualObj(i)->getUrl();
       html += "\">";
@@ -1140,7 +1140,7 @@ vscp_getDeviceInfoHtml(CMDF &mdf, CStandardRegisters &stdregs)
 
     html += "<br><b>Setup wizards</b><ul>";
 
-    for (size_t i = 0; i < mdf.getSetupCount(); i++) {
+    for (unsigned i = 0; i < mdf.getSetupCount(); i++) {
       html += "<li><a href=\"";
       html += mdf.getSetupObj(i)->getUrl();
       html += "\">";
@@ -1889,7 +1889,7 @@ CUserRegisters::remoteVarFromStringToReg(CMDF_RemoteVariable &remoteVar, std::st
         for a level I device but that is not a problem as they never
         will be written to the device.
       */
-      for (size_t i = 0; i < strValue.length(); i++) {
+      for (unsigned i = 0; i < strValue.length(); i++) {
         ppage->putReg(remoteVar.getOffset() + i, strValue[i]);
       }
     } break;

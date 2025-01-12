@@ -9,7 +9,7 @@
 //
 // This file is part of the VSCP (https://www.vscp.org)
 //
-// Copyright:  (C) 2007-2025
+// Copyright:  (C) 2007-2024
 // Ake Hedman, the VSCP project, <info@vscp.org>
 //
 // This file is distributed in the hope that it will be useful,
@@ -400,40 +400,16 @@ public:
   virtual int receive(vscpEvent &ev);
 
   /*!
-      Blocking receive of VSCP event ex from remote host
-      @param ev VSCP event ex that will get the result.
-      @param timeout Timeout in milliseconds. Default is 100 ms.
-      @return Return VSCP_ERROR_SUCCESS of OK and error code else.
-  */
-  virtual int receiveBlocking(vscpEvent &ev, long timeout = 100);
-
-  /*!
       Receive VSCP event ex from remote host
       @return Return VSCP_ERROR_SUCCESS of OK and error code else.
   */
   virtual int receive(vscpEventEx &ex);
 
   /*!
-      Blocking receive of VSCP event ex from remote host
-      @param ex VSCP event ex that will get the result.
-      @param timeout Timeout in milliseconds. Default is 100 ms.
-      @return Return VSCP_ERROR_SUCCESS of OK and error code else.
-  */
-  virtual int receiveBlocking(vscpEventEx &ex, long timeout = 100);
-
-  /*!
       Receive CAN(AL) message from remote host
       @return Return VSCP_ERROR_SUCCESS of OK and error code else.
   */
   virtual int receive(canalMsg &msg);
-
-  /*!
-      Receive blocking CAN(AL) message from remote host
-      @param msg CANAL message that will get the result.
-      @param timeout Timeout in milliseconds. Default is 100 ms.
-      @return Return VSCP_ERROR_SUCCESS of OK and error code else.
-  */
-  virtual int receiveBlocking(canalMsg &msg, long timeout = 100);
 
   /*!
       Set interface filter
@@ -481,15 +457,15 @@ public:
 
   /*!
     Set (and enable) receive callback for events
-    @param callback Pointer to callback for VSCP event delivery
+    @param m_evcallback Pointer to callback for VSCP event delivery
     @param pData Pointer to optional user data.
     @return Return VSCP_ERROR_SUCCESS of OK and error code else.
   */
-  int setCallbackEv(std::function<void(vscpEvent &ev, void *pobj)> callback, void *pData = nullptr);
+  virtual int setCallbackEv(std::function<void(vscpEvent &ev, void *pobj)> callback, void *pData = nullptr);
 
   /*!
     Set (and enable) receive callback ex events
-    @param callback Pointer to callback for VSCP event ex delivery
+    @param m_evcallback Pointer to callback for VSCP event ex delivery
     @param pData Pointer to optional user data.
     @return Return VSCP_ERROR_SUCCESS of OK and error code else.
   */
@@ -728,17 +704,6 @@ public:
     Mutex that protect CANAL interface when callbacks are defined
   */
   pthread_mutex_t m_mutexif;
-  pthread_mutex_t m_mutexReceiveQueue;
-
-  /*!
-    Event object to indicate that there is an event in the
-    output queue
-  */
- #ifdef WIN32
- HANDLE m_semReceiveQueue;
- #else  
-  sem_t m_semReceiveQueue;
- #endif
 
   /*!
     If no callback is defined received events are connected in

@@ -9,7 +9,7 @@
 //
 // This file is part of the VSCP (https://www.vscp.org)
 //
-// Copyright:  (C) 2007-2025
+// Copyright:  (C) 2007-2024
 // Ake Hedman, the VSCP project, <info@vscp.org>
 //
 // This file is distributed in the hope that it will be useful,
@@ -29,7 +29,7 @@
 
 #include "vscp-client-tcp.h"
 
-#define unused(x) ((void) x)
+#define unused(x) ((void)x)
 
 void
 workerThread(vscpClientTcp *pObj);
@@ -50,18 +50,6 @@ vscpClientTcp::vscpClientTcp()
   m_guidif.clear();
   m_bPolling = false;
   m_obid     = 0;
-
-  vscp_clearVSCPFilter(&m_filterIn);  // Accept all events
-  vscp_clearVSCPFilter(&m_filterOut); // Send all events
-
-#ifdef WIN32
-  m_semReceiveQueue = CreateSemaphore(NULL, 0, 0x7fffffff, NULL);
-#else
-  sem_init(&m_semReceiveQueue, 0, 0);
-#endif
-
-  pthread_mutex_init(&m_mutexTcpIpObject, NULL);
-  pthread_mutex_init(&m_mutexReceiveQueue, NULL);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -73,21 +61,12 @@ vscpClientTcp::~vscpClientTcp()
   // Just to be sure
   disconnect();
 
-#ifdef WIN32
-  CloseHandle(m_semReceiveQueue);
-#else
-  sem_destroy(&m_semReceiveQueue);
-#endif
-
-  pthread_mutex_destroy(&m_mutexTcpIpObject);
-  pthread_mutex_destroy(&m_mutexReceiveQueue);
-
   // Clear the input queue (if needed)
-  while (m_receiveList.size()) {
-    vscpEvent *pev = m_receiveList.front();
-    m_receiveList.pop_front();
-    vscp_deleteEvent(pev);
-  }
+  // while (m_inputQue.size()) {
+  //     vscpEvent *pev = m_inputQue.front();
+  //     m_inputQue.pop_front();
+  //     vscp_deleteEvent(pev);
+  // }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -119,17 +98,17 @@ vscpClientTcp::getConfigAsJson(void)
   j["keyfile"]     = m_keyfile;
   j["pwkeyfile"]   = m_pwKeyfile;
 
-  // Filter In
+  // Filter
 
-  j["priority-filter"] = m_filterIn.filter_priority;
-  j["priority-mask"]   = m_filterIn.mask_priority;
-  j["class-filter"]    = m_filterIn.filter_class;
-  j["class-mask"]      = m_filterIn.mask_class;
-  j["type-filter"]     = m_filterIn.filter_type;
-  j["type-mask"]       = m_filterIn.mask_type;
-  vscp_writeGuidArrayToString(str, m_filterIn.filter_GUID);
+  j["priority-filter"] = m_filter.filter_priority;
+  j["priority-mask"]   = m_filter.mask_priority;
+  j["class-filter"]    = m_filter.filter_class;
+  j["class-mask"]      = m_filter.mask_class;
+  j["type-filter"]     = m_filter.filter_type;
+  j["type-mask"]       = m_filter.mask_type;
+  vscp_writeGuidArrayToString(str, m_filter.filter_GUID);
   j["guid-filter"] = str;
-  vscp_writeGuidArrayToString(str, m_filterIn.mask_GUID);
+  vscp_writeGuidArrayToString(str, m_filter.mask_GUID);
   j["guid-mask"] = str;
 
   return j.dump();
@@ -213,37 +192,37 @@ vscpClientTcp::initFromJson(const std::string &config)
     // Filter
 
     if (j.contains("priority-filter")) {
-      m_filterIn.filter_priority = j["priority-filter"].get<uint8_t>();
+      m_filter.filter_priority = j["priority-filter"].get<uint8_t>();
     }
 
     if (j.contains("priority-mask")) {
-      m_filterIn.mask_priority = j["priority-mask"].get<uint8_t>();
+      m_filter.mask_priority = j["priority-mask"].get<uint8_t>();
     }
 
     if (j.contains("class-filter")) {
-      m_filterIn.filter_class = j["class-filter"].get<uint16_t>();
+      m_filter.filter_class = j["class-filter"].get<uint16_t>();
     }
 
     if (j.contains("class-mask")) {
-      m_filterIn.mask_class = j["class-mask"].get<uint16_t>();
+      m_filter.mask_class = j["class-mask"].get<uint16_t>();
     }
 
     if (j.contains("type-filter")) {
-      m_filterIn.filter_type = j["type-filter"].get<uint16_t>();
+      m_filter.filter_type = j["type-filter"].get<uint16_t>();
     }
 
     if (j.contains("type-mask")) {
-      m_filterIn.mask_type = j["type-mask"].get<uint16_t>();
+      m_filter.mask_type = j["type-mask"].get<uint16_t>();
     }
 
     if (j.contains("guid-filter")) {
       std::string str = j["guid-filter"].get<std::string>();
-      vscp_getGuidFromStringToArray(m_filterIn.filter_GUID, str);
+      vscp_getGuidFromStringToArray(m_filter.filter_GUID, str);
     }
 
     if (j.contains("guid-mask")) {
       std::string str = j["guid-mask"].get<std::string>();
-      vscp_getGuidFromStringToArray(m_filterIn.mask_GUID, str);
+      vscp_getGuidFromStringToArray(m_filter.mask_GUID, str);
     }
   }
   catch (...) {
@@ -433,63 +412,6 @@ vscpClientTcp::receive(canalMsg &msg)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// receiveBlocking
-//
-
-int
-vscpClientTcp::receiveBlocking(vscpEvent &ev, long timeout)
-{
-  if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
-    if (errno == ETIMEDOUT) {
-      return VSCP_ERROR_TIMEOUT;
-    }
-    else {
-      return VSCP_ERROR_ERROR;
-    }
-  }
-
-  return receive(ev);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// receiveBlocking
-//
-
-int
-vscpClientTcp::receiveBlocking(vscpEventEx &ex, long timeout)
-{
-  if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
-    if (errno == ETIMEDOUT) {
-      return VSCP_ERROR_TIMEOUT;
-    }
-    else {
-      return VSCP_ERROR_ERROR;
-    }
-  }
-
-  return receive(ex);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// receiveBlocking
-//
-
-int
-vscpClientTcp::receiveBlocking(canalMsg &msg, long timeout)
-{
-  if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
-    if (errno == ETIMEDOUT) {
-      return VSCP_ERROR_TIMEOUT;
-    }
-    else {
-      return VSCP_ERROR_ERROR;
-    }
-  }
-
-  return receive(msg);
-}
-
-///////////////////////////////////////////////////////////////////////////////
 // setfilter
 //
 
@@ -500,9 +422,9 @@ vscpClientTcp::setfilter(vscpEventFilter &filter)
     return m_tcp.doCmdFilter(&filter);
   }
   else {
-    pthread_mutex_lock(&m_mutexTcpIpObject);
+    m_mutexReceive.lock();
     return m_tcpReceive.doCmdFilter(&filter);
-    pthread_mutex_unlock(&m_mutexTcpIpObject);
+    m_mutexReceive.unlock();
   }
 }
 
@@ -513,9 +435,8 @@ vscpClientTcp::setfilter(vscpEventFilter &filter)
 int
 vscpClientTcp::getcount(uint16_t *pcount)
 {
-  if (NULL == pcount) {
+  if (NULL == pcount)
     return VSCP_ERROR_INVALID_POINTER;
-  }
   *pcount = m_tcp.doCmdDataAvailable();
   return VSCP_ERROR_SUCCESS;
 }
@@ -556,8 +477,9 @@ vscpClientTcp::getinterfaces(std::deque<std::string> &iflist)
 //
 
 int
-vscpClientTcp::getwcyd(uint64_t & /*wcyd*/)
+vscpClientTcp::getwcyd(uint64_t &wcyd)
 {
+  unused(wcyd);
   return VSCP_ERROR_SUCCESS;
 }
 
@@ -632,9 +554,8 @@ workerThread(vscpClientTcp *pObj)
   ev.pdata    = NULL;
 
   // Check pointer
-  if (nullptr == pObj) {
+  if (nullptr == pObj)
     return;
-  }
 
   VscpRemoteTcpIf *m_pifReceive = pObj->getTcpReceive();
 
@@ -642,31 +563,11 @@ workerThread(vscpClientTcp *pObj)
 
   while (pObj->m_bRun) {
 
-    pthread_mutex_lock(&pObj->m_mutexTcpIpObject);
+    pObj->m_mutexReceive.lock();
 
+    // m_pif->rcvloopRead(500);
     if (VSCP_ERROR_SUCCESS == m_pifReceive->doCmdBlockingReceive(&ev)) {
-
-      if (vscp_doLevel2Filter(&ev, &pObj->m_filterIn)) {
-
-        if (pObj->isCallbackEvActive()) {
-          pObj->m_callbackev(ev, pObj->getCallbackObj());
-        }
-
-        if (pObj->isCallbackExActive()) {
-          vscpEventEx ex;
-          if (vscp_convertEventToEventEx(&ex, &ev)) {
-            pObj->m_callbackex(ex, pObj->getCallbackObj());
-          }
-        }
-
-        // Add to input queue only if no callback set
-        if (!pObj->isCallbackEvActive() || !pObj->isCallbackExActive()) {
-          pthread_mutex_lock(&pObj->m_mutexReceiveQueue);
-          pObj->m_receiveList.push_back(&ev);
-          sem_post(&pObj->m_semReceiveQueue);
-          pthread_mutex_unlock(&pObj->m_mutexReceiveQueue);
-        }
-      }
+      pObj->sendToCallbacks(&ev);
       vscp_deleteEvent(&ev);
     }
 
@@ -674,6 +575,6 @@ workerThread(vscpClientTcp *pObj)
       pObj->m_bRun = false;
     }
 
-    pthread_mutex_unlock(&pObj->m_mutexTcpIpObject);
+    pObj->m_mutexReceive.unlock();
   }
 }

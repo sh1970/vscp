@@ -9,7 +9,7 @@
 //
 // This file is part of the VSCP (https://www.vscp.org)
 //
-// Copyright © 2000-2025 Ake Hedman, Grodans Paradis AB
+// Copyright © 2000-2024 Ake Hedman, Grodans Paradis AB
 // <info@grodansparadis.com>
 //
 // This file is distributed in the hope that it will be useful,
@@ -79,6 +79,8 @@
 // https://github.com/nlohmann/json
 using json = nlohmann::json;
 using namespace kainjow::mustache;
+
+#define unused(x) ((void) x)
 
 // Forward declaration
 static void *
@@ -153,7 +155,6 @@ vscpClientSocketCan::vscpClientSocketCan()
 vscpClientSocketCan::~vscpClientSocketCan()
 {
   disconnect();
-
   pthread_mutex_destroy(&m_mutexSocket);
 
   sem_destroy(&m_semSendQueue);
@@ -161,13 +162,6 @@ vscpClientSocketCan::~vscpClientSocketCan()
 
   pthread_mutex_destroy(&m_mutexSendQueue);
   pthread_mutex_destroy(&m_mutexReceiveQueue);
-
-  // Clear the input queue (if needed)
-  while (m_receiveList.size()) {
-    vscpEvent *pev = m_receiveList.front();
-    m_receiveList.pop_front();
-    vscp_deleteEvent(pev);
-  }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -175,11 +169,9 @@ vscpClientSocketCan::~vscpClientSocketCan()
 //
 
 int
-vscpClientSocketCan::init(const std::string &interface,
-                          const std::string &guid,
-                          unsigned long flags,
-                          uint32_t /*timeout*/)
+vscpClientSocketCan::init(const std::string &interface, const std::string &guid, unsigned long flags, uint32_t timeout)
 {
+  unused(timeout);
   m_interface = interface;
   m_guid.getFromString(guid);
   m_flags = flags;
@@ -501,7 +493,7 @@ vscpClientSocketCan::send(canalMsg &msg)
 int
 vscpClientSocketCan::receive(vscpEvent &ev)
 {
-  int rv = VSCP_ERROR_SUCCESS;
+  // int rv;
 
   // Check if there are any events waiting
   if (!m_receiveList.size()) {
@@ -519,7 +511,7 @@ vscpClientSocketCan::receive(vscpEvent &ev)
   pthread_mutex_unlock(&m_mutexReceiveQueue);
   vscp_deleteEvent(pev);
 
-  return rv;
+  return VSCP_ERROR_SUCCESS;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -546,7 +538,7 @@ vscpClientSocketCan::receive(vscpEventEx &ex)
 int
 vscpClientSocketCan::receive(canalMsg &msg)
 {
-  int rv = VSCP_ERROR_SUCCESS;
+  // int rv;
 
   // Check if there are any events waiting
   if (!m_receiveList.size()) {
@@ -566,64 +558,7 @@ vscpClientSocketCan::receive(canalMsg &msg)
   vscp_deleteEvent(pev);
   pev = nullptr;
 
-  return rv;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// receiveBlocking
-//
-
-int
-vscpClientSocketCan::receiveBlocking(vscpEvent &ev, long timeout)
-{
-  if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
-    if (errno == ETIMEDOUT) {
-      return VSCP_ERROR_TIMEOUT;
-    }
-    else {
-      return VSCP_ERROR_ERROR;
-    }
-  }
-
-  return receive(ev);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// receiveBlocking
-//
-
-int
-vscpClientSocketCan::receiveBlocking(vscpEventEx &ex, long timeout)
-{
-  if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
-    if (errno == ETIMEDOUT) {
-      return VSCP_ERROR_TIMEOUT;
-    }
-    else {
-      return VSCP_ERROR_ERROR;
-    }
-  }
-
-  return receive(ex);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// receiveBlocking
-//
-
-int
-vscpClientSocketCan::receiveBlocking(canalMsg &msg, long timeout)
-{
-  if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
-    if (errno == ETIMEDOUT) {
-      return VSCP_ERROR_TIMEOUT;
-    }
-    else {
-      return VSCP_ERROR_ERROR;
-    }
-  }
-
-  return receive(msg);
+  return VSCP_ERROR_SUCCESS;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -631,10 +566,10 @@ vscpClientSocketCan::receiveBlocking(canalMsg &msg, long timeout)
 //
 
 int
-vscpClientSocketCan::setfilter(vscpEventFilter & /*filter*/)
+vscpClientSocketCan::setfilter(vscpEventFilter &filter)
 {
-  int rv = VSCP_ERROR_SUCCESS;
-
+  // int rv;
+  unused(filter);
   // uint32_t _filter = ((unsigned long) filter.filter_priority << 26) | ((unsigned long) filter.filter_class << 16) |
   //                    ((unsigned long) filter.filter_type << 8) | filter.filter_GUID[0];
   // if ( CANAL_ERROR_SUCCESS == (rv = m_canalif.CanalSetFilter(_filter))) {
@@ -643,9 +578,7 @@ vscpClientSocketCan::setfilter(vscpEventFilter & /*filter*/)
 
   // uint32_t _mask = ((unsigned long) filter.mask_priority << 26) | ((unsigned long) filter.mask_class << 16) |
   //                  ((unsigned long) filter.mask_type << 8) | filter.mask_GUID[0];
-  // m_canalif.CanalSetMask(_mask);
-
-  return rv;
+  return 0; // m_canalif.CanalSetMask(_mask);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -674,13 +607,13 @@ vscpClientSocketCan::clear()
 //
 
 int
-vscpClientSocketCan::getversion(uint8_t * /*pmajor*/,
-                                uint8_t * /*pminor*/,
-                                uint8_t * /*prelease*/,
-                                uint8_t * /*pbuild*/)
+vscpClientSocketCan::getversion(uint8_t *pmajor, uint8_t *pminor, uint8_t *prelease, uint8_t *pbuild)
 {
   // uint32_t ver = m_canalif.CanalGetDllVersion();
-
+  unused(pmajor);
+  unused(pminor);
+  unused(prelease);
+  unused(pbuild);
   return VSCP_ERROR_SUCCESS;
 }
 
@@ -689,8 +622,9 @@ vscpClientSocketCan::getversion(uint8_t * /*pmajor*/,
 //
 
 int
-vscpClientSocketCan::getinterfaces(std::deque<std::string> & /*iflist*/)
+vscpClientSocketCan::getinterfaces(std::deque<std::string> &iflist)
 {
+  unused(iflist);
   // No interfaces available
   return VSCP_ERROR_SUCCESS;
 }
@@ -711,9 +645,9 @@ vscpClientSocketCan::getwcyd(uint64_t &wcyd)
 //
 
 void
-vscpClientSocketCan::setConnectionTimeout(uint32_t /*timeout*/)
+vscpClientSocketCan::setConnectionTimeout(uint32_t timeout)
 {
-  ;
+  unused(timeout);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -731,9 +665,9 @@ vscpClientSocketCan::getConnectionTimeout(void)
 //
 
 void
-vscpClientSocketCan::setResponseTimeout(uint32_t /*timeout*/)
+vscpClientSocketCan::setResponseTimeout(uint32_t timeout)
 {
-  ;
+  unused(timeout);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -896,7 +830,7 @@ workerThread(void *pData)
     setsockopt(pObj->m_socket, SOL_SOCKET, SO_RCVTIMEO, (const char *) &tv, sizeof(struct timeval));
 
     if (bind(pObj->m_socket, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
-      spdlog::error("SOCKETCAN client: workthread socketcan client: Error in socket bind. Terminating!");
+      spdlog::error("SOCKETCAN client: wrkthread socketcan client: Error in socket bind. Terminating!");
       close(pObj->m_socket);
       sleep(2);
       // continue;
@@ -1003,7 +937,7 @@ workerThread(void *pData)
               }
             }
 
-            // printf("Socketcan event: %X:%X\n", pEvent->vscp_class, pEvent->vscp_type);
+            printf("Socketcan event: %X:%X\n", pEvent->vscp_class, pEvent->vscp_type);
 
             // Add to input queue only if no callback set
             if (!pObj->isCallbackEvActive() || !pObj->isCallbackExActive()) {

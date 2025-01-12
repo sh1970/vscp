@@ -9,7 +9,7 @@
 //
 // This file is part of the VSCP (https://www.vscp.org)
 //
-// Copyright:  (C) 2007-2025
+// Copyright:  (C) 2007-2024
 // Ake Hedman, the VSCP project, <info@vscp.org>
 //
 // This file is distributed in the hope that it will be useful,
@@ -38,17 +38,19 @@
 #include "vscp-client-canal.h"
 #include "vscphelper.h"
 
-// #include <mustache.hpp>
+
+
+//#include <mustache.hpp>
 #include <nlohmann/json.hpp> // Needs C++11  -std=c++11
 
 // for convenience
 using json = nlohmann::json;
-// using namespace kainjow::mustache;
+//using namespace kainjow::mustache;
 
-// #include <spdlog/sinks/rotating_file_sink.h>
+//#include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/spdlog.h>
 
-#define unused(x) ((void) x)
+#define unused(x) ((void)x)
 
 // Forward declaration
 static void *
@@ -64,21 +66,7 @@ vscpClientCanal::vscpClientCanal()
   m_bConnected = false; // Not connected
   // m_tid = 0;
   m_bRun = true;
-
-  vscp_clearVSCPFilter(&m_filterIn); // Accept all events
-
   pthread_mutex_init(&m_mutexif, NULL);
-  pthread_mutex_init(&m_mutexReceiveQueue, NULL);
-
-// sem_init(&m_semSendQueue, 0, 0);
-#ifdef WIN32
-  m_semReceiveQueue = CreateSemaphore(NULL, 0, 0x7fffffff, NULL);
-#else
-  sem_init(&m_semReceiveQueue, 0, 0);
-#endif
-
-  // pthread_mutex_init(&m_mutexSendQueue, NULL);
-  pthread_mutex_init(&m_mutexReceiveQueue, NULL);
 
   spdlog::trace("CANAL CLIENT: constructor vscp_client_canal object.");
 }
@@ -90,23 +78,7 @@ vscpClientCanal::vscpClientCanal()
 vscpClientCanal::~vscpClientCanal()
 {
   disconnect();
-
-#ifdef WIN32
-  CloseHandle(m_semReceiveQueue);
-#else
-  sem_destroy(&m_semReceiveQueue);
-#endif
-
   pthread_mutex_destroy(&m_mutexif);
-  pthread_mutex_destroy(&m_mutexReceiveQueue);
-
-  // Clear the input queue (if needed)
-  while (m_receiveQueue.size()) {
-    vscpEvent *pev = m_receiveQueue.front();
-    m_receiveQueue.pop_front();
-    vscp_deleteEvent(pev);
-  }
-
   spdlog::trace("CANAL CLIENT: destructor vscp_client_canal object.");
 }
 
@@ -163,13 +135,13 @@ vscpClientCanal::initFromJson(const std::string &config)
       spdlog::error("CANAL CLIENT: JSON init: Name must be set.");
       return false; // Must be set
     }
-    spdlog::debug("CANAL CLIENT: JSON init: name={}.", (std::string) j["name"]);
+    spdlog::debug("CANAL CLIENT: JSON init: name={}.", (std::string)j["name"]);
 
     if (!j["path"].is_string()) {
       spdlog::error("CANAL CLIENT: JSON init: Path must be set.");
       return false; // Must be set
     }
-    spdlog::debug("CANAL CLIENT: JSON init: path={}.", (std::string) j["path"]);
+    spdlog::debug("CANAL CLIENT: JSON init: path={}.", (std::string)j["path"]);
 
     if (j.contains("config")) {
       if (!j["config"].is_string()) {
@@ -180,7 +152,7 @@ vscpClientCanal::initFromJson(const std::string &config)
     else {
       j["config"] = ""; // Set default
     }
-    spdlog::debug("CANAL CLIENT: JSON init: config=\"{}\".", (std::string) j["config"]);
+    spdlog::debug("CANAL CLIENT: JSON init: config=\"{}\".", (std::string)j["config"]);
 
     if (j.contains("flags")) {
       if (j["flags"].is_string()) {
@@ -190,7 +162,7 @@ vscpClientCanal::initFromJson(const std::string &config)
     else {
       j["flags"] = 0; // Set default
     }
-    spdlog::debug("CANAL CLIENT: JSON init: flags={}.", (uint32_t) j["flags"]);
+    spdlog::debug("CANAL CLIENT: JSON init: flags={}.", (uint32_t)j["flags"]);
 
     if (j.contains("datarate")) {
       if (j["datarate"].is_string()) {
@@ -200,7 +172,7 @@ vscpClientCanal::initFromJson(const std::string &config)
     else {
       j["datarate"] = 0; // Set default
     }
-    spdlog::debug("CANAL CLIENT: JSON init: datarate={}.", (int) j["datarate"]);
+    spdlog::debug("CANAL CLIENT: JSON init: datarate={}.", (int)j["datarate"]);
 
     setName(j["name"]);
     return (init(j["path"], j["config"], j["flags"], j["datarate"]));
@@ -388,8 +360,8 @@ int
 vscpClientCanal::receive(canalMsg &msg)
 {
   int rv;
-  // canalMsg canalMsg;
-  // uint8_t guid[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+  //canalMsg canalMsg;
+  //uint8_t guid[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
   spdlog::debug("CANAL CLIENT: Poll for event ex.");
 
@@ -402,66 +374,6 @@ vscpClientCanal::receive(canalMsg &msg)
   pthread_mutex_unlock(&m_mutexif);
 
   return (rv ? VSCP_ERROR_SUCCESS : VSCP_ERROR_ERROR);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// receiveBlocking
-//
-
-int
-vscpClientCanal::receiveBlocking(vscpEvent &ev, long timeout)
-{
-  unused(timeout);
-  // if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
-  //   if (errno == ETIMEDOUT) {
-  //     return VSCP_ERROR_TIMEOUT;
-  //   }
-  //   else {
-  //     return VSCP_ERROR_ERROR;
-  //   }
-  // }
-
-  return receive(ev);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// receiveBlocking
-//
-
-int
-vscpClientCanal::receiveBlocking(vscpEventEx &ex, long timeout)
-{
-  unused(timeout);
-  // if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
-  //   if (errno == ETIMEDOUT) {
-  //     return VSCP_ERROR_TIMEOUT;
-  //   }
-  //   else {
-  //     return VSCP_ERROR_ERROR;
-  //   }
-  // }
-
-  return receive(ex);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// receiveBlocking
-//
-
-int
-vscpClientCanal::receiveBlocking(canalMsg &msg, long timeout)
-{
-  unused(timeout);
-  // if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
-  //   if (errno == ETIMEDOUT) {
-  //     return VSCP_ERROR_TIMEOUT;
-  //   }
-  //   else {
-  //     return VSCP_ERROR_ERROR;
-  //   }
-  // }
-
-  return receive(msg);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -523,9 +435,13 @@ vscpClientCanal::clear()
 //
 
 int
-vscpClientCanal::getversion(uint8_t * /*pmajor*/, uint8_t * /*pminor*/, uint8_t * /*prelease*/, uint8_t * /*pbuild*/)
+vscpClientCanal::getversion(uint8_t *pmajor, uint8_t *pminor, uint8_t *prelease, uint8_t *pbuild)
 {
-  // uint32_t ver = m_canalif.CanalGetDllVersion();
+  unused(pmajor);
+  unused(pminor);
+  unused(prelease);
+  unused(pbuild);
+  //uint32_t ver = m_canalif.CanalGetDllVersion();
 
   return VSCP_ERROR_SUCCESS;
 }
@@ -535,8 +451,9 @@ vscpClientCanal::getversion(uint8_t * /*pmajor*/, uint8_t * /*pminor*/, uint8_t 
 //
 
 int
-vscpClientCanal::getinterfaces(std::deque<std::string> & /*iflist*/)
+vscpClientCanal::getinterfaces(std::deque<std::string> &iflist)
 {
+  unused(iflist);
   // No interfaces available
   return VSCP_ERROR_SUCCESS;
 }
@@ -557,9 +474,9 @@ vscpClientCanal::getwcyd(uint64_t &wcyd)
 //
 
 void
-vscpClientCanal::setConnectionTimeout(uint32_t /*timeout*/)
+vscpClientCanal::setConnectionTimeout(uint32_t timeout)
 {
-  ;
+  unused(timeout);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -577,9 +494,9 @@ vscpClientCanal::getConnectionTimeout(void)
 //
 
 void
-vscpClientCanal::setResponseTimeout(uint32_t /*timeout*/)
+vscpClientCanal::setResponseTimeout(uint32_t timeout)
 {
-  ;
+  unused(timeout);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -606,7 +523,7 @@ vscpClientCanal::setCallbackEv(std::function<void(vscpEvent &ev, void *pobj)> ca
   }
 
   spdlog::debug("CANAL CLIENT: ev callback set.");
-  CVscpClient::setCallbackEv(callback, pData);
+ CVscpClient::setCallbackEv(callback, pData);
   return VSCP_ERROR_SUCCESS;
 }
 
@@ -653,7 +570,6 @@ win_usleep(__int64 usec)
 static void *
 workerThread(void *pObj)
 {
-  canalMsg msg;
   uint8_t guid[]           = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
   vscpClientCanal *pClient = (vscpClientCanal *) pObj;
   VscpCanalDeviceIf *pif   = (VscpCanalDeviceIf *) &(pClient->m_canalif);
@@ -665,74 +581,48 @@ workerThread(void *pObj)
 
   while (pClient->m_bRun) {
 
-    spdlog::trace("CANAL CLIENT: workertread start.");
+    spdlog::trace("CANAL CLIENT: worktread start.");
+
+    pthread_mutex_lock(&pClient->m_mutexif);
 
     // Check if there are events to fetch
-    // int cnt;
-    // if ((cnt = pClient->m_canalif.CanalDataAvailable())) {
+    int cnt;
+    if ((cnt = pClient->m_canalif.CanalDataAvailable())) {
 
-    // while (cnt) {
-
-    if (CANAL_ERROR_SUCCESS == pClient->m_canalif.CanalBlockingReceive(&msg, 100)) {
-
-      spdlog::trace("CANAL CLIENT: workthread. Event received");
-
-      pthread_mutex_lock(&pClient->m_mutexif);
-
-      if (pClient->isCallbackEvActive()) {
-        vscpEvent ev;
-        if (vscp_convertCanalToEvent(&ev, &msg, guid)) {
-          if (vscp_doLevel2Filter(&ev, &pClient->m_filterIn)) {
-            spdlog::trace("CANAL CLIENT: workthread. Event sent to ev callback");
-            pClient->m_callbackev(ev, pClient->getCallbackObj());
+      while (cnt) {
+        canalMsg msg;
+        if (CANAL_ERROR_SUCCESS == pClient->m_canalif.CanalReceive(&msg)) {
+          spdlog::debug("CANAL CLIENT: workthread. Event recived");
+          if (pClient->isCallbackEvActive()) {
+            vscpEvent ev;
+            if (vscp_convertCanalToEvent(&ev, &msg, guid)) {
+              spdlog::trace("CANAL CLIENT: workthread. Event sent to ev callback");
+              pClient->m_callbackev(ev, pClient->getCallbackObj());
+            }
+          }
+          if (pClient->isCallbackExActive()) {
+            vscpEventEx ex;
+            if (vscp_convertCanalToEventEx(&ex, &msg, guid)) {
+              spdlog::trace("CANAL CLIENT: workthread. Event sent to ex callback");
+              pClient->m_callbackex(ex, pClient->getCallbackObj());
+            }
           }
         }
+        cnt--;
       }
-      else if (pClient->isCallbackExActive()) {
-        vscpEventEx ex;
-        if (vscp_convertCanalToEventEx(&ex, &msg, guid)) {
-          if (vscp_doLevel2FilterEx(&ex, &pClient->m_filterIn)) {
-            spdlog::trace("CANAL CLIENT: workthread. Event sent to ex callback");
-            pClient->m_callbackex(ex, pClient->getCallbackObj());
-          }
-        }
-      }
-      else {
+    }
 
-        // No callback defined so save event in incoming queue
+    pthread_mutex_unlock(&pClient->m_mutexif);
 
-        vscpEvent *pev = new vscpEvent;
-        if (nullptr == pev) {
-          spdlog::critical("CANAL CLIENT: Memory problem.");
-          return NULL;
-        }
-        if (vscp_convertCanalToEvent(pev, &msg, guid)) {
-          if (vscp_doLevel2Filter(pev, &pClient->m_filterIn)) {
-            pthread_mutex_lock(&pClient->m_mutexReceiveQueue);
-            pClient->m_receiveQueue.push_back(pev);
-            sem_post(&pClient->m_semReceiveQueue);
-            pthread_mutex_unlock(&pClient->m_mutexReceiveQueue);
-          }
-        }
-        else {
-          vscp_deleteEvent(pev);
-        }
-      }
+#ifndef WIN32
+    usleep(200);
+#else
+    win_usleep(200);
+#endif
 
-      pthread_mutex_unlock(&pClient->m_mutexif);
+    spdlog::trace("CANAL CLIENT: worktread end.");
 
-    } // message received
   } // while
-    // cnt--;
-  //}
-
-  // #ifndef WIN32
-  //     usleep(200);
-  // #else
-  //     win_usleep(200);
-  // #endif
-
-  spdlog::trace("CANAL CLIENT: workthread end.");
 
   return NULL;
 }

@@ -9,7 +9,7 @@
 //
 // This file is part of the VSCP (https://www.vscp.org)
 //
-// Copyright © 2000-2025 Ake Hedman, Grodans Paradis AB
+// Copyright © 2000-2024 Ake Hedman, Grodans Paradis AB
 // <info@grodansparadis.com>
 //
 // This file is distributed in the hope that it will be useful,
@@ -150,42 +150,16 @@ public:
   virtual int receive(vscpEvent &ev);
 
   /*!
-      Blocking receive of VSCP event ex from remote host
-      @param ev VSCP event ex that will get the result.
-      @param timeout Timeout in milliseconds. Default is 100 ms.
-      @return Return VSCP_ERROR_SUCCESS of OK and error code else.
-  */
-  virtual int receiveBlocking(vscpEvent &ev, long timeout = 100 );
-
-  /*!
       Receive VSCP event ex from remote host
-      @param ex VSCP event ex that will get the result.
       @return Return VSCP_ERROR_SUCCESS of OK and error code else.
   */
   virtual int receive(vscpEventEx &ex);
 
   /*!
-      Blocking receive of VSCP event ex from remote host
-      @param ex VSCP event ex that will get the result.
-      @param timeout Timeout in milliseconds. Default is 100 ms.
-      @return Return VSCP_ERROR_SUCCESS of OK and error code else.
-  */
-  virtual int receiveBlocking(vscpEventEx &ex, long timeout = 100 );
-
-  /*!
       Receive CAN(AL) message from remote host
-      @param msg CANAL message that will get the result.
       @return Return VSCP_ERROR_SUCCESS of OK and error code else.
   */
   virtual int receive(canalMsg &msg);
-
-  /*!
-      Receive blocking CAN(AL) message from remote host
-      @param msg CANAL message that will get the result.
-      @param timeout Timeout in milliseconds. Default is 100 ms.
-      @return Return VSCP_ERROR_SUCCESS of OK and error code else.
-  */
-  virtual int receiveBlocking(canalMsg &msg, long timeout = 100);
 
   /*!
       Set interface filter

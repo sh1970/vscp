@@ -9,7 +9,7 @@
 //
 // This file is part of the VSCP (https://www.vscp.org)
 //
-// Copyright © 2000-2025 Ake Hedman, Grodans Paradis AB
+// Copyright © 2000-2024 Ake Hedman, Grodans Paradis AB
 // <info@grodansparadis.com>
 //
 // This file is distributed in the hope that it will be useful,
@@ -45,7 +45,7 @@ using json = nlohmann::json;
 // std::function<void(vscpEvent &ev, void *pobj)>
 // std::function<void(vscpEventEx &ex, void *pobj)>
 // typedef void(__stdcall *CALLBACK_EV)(vscpEvent *pev, void *pobj);   // Event callback
-// typedef void(__stdcall *CALLBACK_EX)(vscpEventEx *pex, void *pobj); // Event ex callback
+// typedef void(__stdcall *CALLBACK_EX)(vscpEventEx *pex, void *pobj); // Event ex callbac
 #else
 // typedef void (*CALLBACK_EV)(vscpEvent *pev, void *pobj);   // Event callback
 // typedef void (*CALLBACK_EX)(vscpEventEx *pex, void *pobj); // Event ex callback
@@ -130,41 +130,16 @@ public:
   virtual int receive(vscpEvent &ev) = 0;
 
   /*!
-      Blocking receive of VSCP event ex from remote host
-      @param ev VSCP event that will get the result.
-      @param timeout Timeout in milliseconds. Zero is no wait. Default is 100 ms.
-      @return Return VSCP_ERROR_SUCCESS of OK and error code else.
-  */
-  virtual int receiveBlocking(vscpEvent &ev, long timeout = 100) = 0;
-
-  /*!
       Receive VSCP event ex from remote host
       @return Return VSCP_ERROR_SUCCESS of OK and error code else.
   */
   virtual int receive(vscpEventEx &ex) = 0;
 
   /*!
-     Blocking receive of VSCP event ex from remote host
-     @param ex VSCP event ex that will get the result.
-     @param timeout Timeout in milliseconds. Zero is no wait. Default is 100 ms.
-     @return Return VSCP_ERROR_SUCCESS of OK and error code else.
- */
-  virtual int receiveBlocking(vscpEventEx &ex, long timeout = 100) = 0;
-
-  /*!
       Receive CAN(AL) message from remote host
-      @param msg CANAL message that will get the result.
       @return Return VSCP_ERROR_SUCCESS of OK and error code else.
   */
   virtual int receive(canalMsg &msg) = 0;
-
-  /*!
-      Blocking receive of VSCP event ex from remote host
-      @param msg CANAL message that will get the result.
-      @param timeout Timeout in milliseconds. Zero is no wait. Default is 100 ms.
-      @return Return VSCP_ERROR_SUCCESS of OK and error code else.
-  */
-  virtual int receiveBlocking(canalMsg &msg, long timeout = 100) = 0;
 
   /*!
       Set interface filter
@@ -212,7 +187,7 @@ public:
 
   /*!
       Set (and enable) receive callback for events
-      @param callback Callback to call when an event is received
+      @param LPFNDLL_EX_CALLBACK Callback to call when an event is received
       @param pData User defined data to pass in callback call
       @return Return VSCP_ERROR_SUCCESS of OK and error code else.
   */
@@ -220,7 +195,7 @@ public:
 
   /*!
       Set (and enable) receive callback ex events
-      @param callback Callback to call when an event is received
+      @param LPFNDLL_EX_CALLBACK Callback to call when an event is received
       @param pData User defined data to pass in callback call
       @return Return VSCP_ERROR_SUCCESS of OK and error code else.
   */
@@ -312,7 +287,7 @@ public:
     @param Pointer to object to set
   */
 
-  void setCallbackObj(void *pobj) { m_callbackObject = pobj; };
+ void setCallbackObj(void *pobj) { m_callbackObject = pobj; };
 
   /*!
     Return Callback object
@@ -321,6 +296,7 @@ public:
   void *getCallbackObj(void) { return m_callbackObject; };
 
 public:
+
   /*!
       Callback for events
   */
@@ -332,6 +308,7 @@ public:
   std::function<void(vscpEventEx &ex, void *pobj)> m_callbackex;
 
 protected:
+
   /// Type of connection object
   connType m_type = CVscpClient::connType::NONE;
 
@@ -350,6 +327,8 @@ protected:
       setter and is sent with the callback call
   */
   void *m_callbackObject;
+
+  
 
   /// Name for connection object
   std::string m_name;

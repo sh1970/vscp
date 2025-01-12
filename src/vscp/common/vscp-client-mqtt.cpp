@@ -9,7 +9,7 @@
 //
 // This file is part of the VSCP (https://www.vscp.org)
 //
-// Copyright (C) 2007-2025
+// Copyright (C)2007-2024
 // Ake Hedman, the VSCP project, <info@vscp.org>
 //
 // This file is distributed in the hope that it will be useful,
@@ -55,15 +55,17 @@
 #include <spdlog/spdlog.h>
 
 #include <mustache.hpp>
-#include <nlohmann/json.hpp>
+#include <nlohmann/json.hpp> 
 
 // for convenience
 using json = nlohmann::json;
 using namespace kainjow::mustache;
 
-#define unused(x) ((void) x)
+#define unused(x) ((void)x)
 
 // Forward declaration
+static void *
+workerThread(void *pObj);
 
 // ----------------------------------------------------------------------------
 
@@ -83,8 +85,10 @@ using namespace kainjow::mustache;
 */
 
 int
-password_callback(char *buf, int size, int /*rwflag*/, void *userdata)
+password_callback(char *buf, int size, int rwflag, void *userdata)
 {
+  unused(rwflag);
+
   // Check pointers
   if ((nullptr == buf) || (nullptr == userdata)) {
     return 0;
@@ -136,7 +140,7 @@ mqtt_on_log(struct mosquitto *mosq, void *pData, int level, const char *logmsg)
 static void
 mqtt_on_connect(struct mosquitto *mosq, void *pData, int rv)
 {
-  
+
   // Check for valid handle
   if (nullptr == mosq) {
     return;
@@ -191,8 +195,10 @@ mqtt_on_connect_flags(struct mosquitto *mosq, void *pData, int rv, int flags)
 
 #if LIBMOSQUITTO_MAJOR > 1 || (LIBMOSQUITTO_MAJOR == 1 && LIBMOSQUITTO_MINOR >= 6)
 static void
-mqtt_on_connect_v5(struct mosquitto *mosq, void *pData, int rv, int flags, const mosquitto_property * /*props*/)
+mqtt_on_connect_v5(struct mosquitto *mosq, void *pData, int rv, int flags, const mosquitto_property *props)
 {
+  unused(props);
+
   // Check for valid handle
   if (nullptr == mosq) {
     return;
@@ -247,8 +253,10 @@ mqtt_on_disconnect(struct mosquitto *mosq, void *pData, int rv)
 
 #if LIBMOSQUITTO_MAJOR > 1 || (LIBMOSQUITTO_MAJOR == 1 && LIBMOSQUITTO_MINOR >= 6)
 static void
-mqtt_on_disconnect_v5(struct mosquitto *mosq, void *pData, int rv, const mosquitto_property * /*props*/)
+mqtt_on_disconnect_v5(struct mosquitto *mosq, void *pData, int rv, const mosquitto_property *props)
 {
+  unused(props);
+
   // Check for valid handle
   if (nullptr == mosq) {
     return;
@@ -301,8 +309,10 @@ mqtt_on_publish(struct mosquitto *mosq, void *pData, int mid)
 
 #if LIBMOSQUITTO_MAJOR > 1 || (LIBMOSQUITTO_MAJOR == 1 && LIBMOSQUITTO_MINOR >= 6)
 static void
-mqtt_on_publish_v5(struct mosquitto *mosq, void *pData, int mid, int reason_code, const mosquitto_property * /*props*/)
+mqtt_on_publish_v5(struct mosquitto *mosq, void *pData, int mid, int reason_code, const mosquitto_property *props)
 {
+  unused(props);
+
   // Check for valid handle
   if (nullptr == mosq) {
     return;
@@ -367,8 +377,10 @@ static void
 mqtt_on_message_v5(struct mosquitto *mosq,
                    void *pData,
                    const struct mosquitto_message *pMsg,
-                   const mosquitto_property * /*props*/)
+                   const mosquitto_property *props)
 {
+  unused(props);
+
   // Check for valid handle
   if (nullptr == mosq) {
     return;
@@ -435,8 +447,10 @@ mqtt_on_subscribe_v5(struct mosquitto *mosq,
                      int mid,
                      int qos_count,
                      const int *granted_qos,
-                     const mosquitto_property * /*props*/)
+                     const mosquitto_property *props)
 {
+  unused(props);
+
   // Check for valid handle
   if (nullptr == mosq) {
     return;
@@ -491,8 +505,9 @@ mqtt_on_unsubscribe(struct mosquitto *mosq, void *pData, int mid)
 
 #if LIBMOSQUITTO_MAJOR > 1 || (LIBMOSQUITTO_MAJOR == 1 && LIBMOSQUITTO_MINOR >= 6)
 static void
-mqtt_on_unsubscribe_v5(struct mosquitto *mosq, void *pData, int mid, const mosquitto_property * /*props*/)
+mqtt_on_unsubscribe_v5(struct mosquitto *mosq, void *pData, int mid, const mosquitto_property *props)
 {
+  unused(props);
   // Check for valid handle
   if (nullptr == mosq) {
     return;
@@ -544,7 +559,6 @@ publishTopic::publishTopic(const std::string &topic, enumMqttMsgFormat format, i
 
 publishTopic::~publishTopic()
 {
-
 #if LIBMOSQUITTO_MAJOR > 1 || (LIBMOSQUITTO_MAJOR == 1 && LIBMOSQUITTO_MINOR >= 6)
   mosquitto_property_free_all(&m_properties);
 #endif
@@ -608,8 +622,8 @@ vscpClientMqtt::vscpClientMqtt(void)
   m_mapMqttIntOptions["send-maximum"]     = 20;
 
 #ifndef WIN32
-  m_tid = 0; // pthread
-#endif
+  m_tid                 = 0;           // pthread
+#endif  
   m_bConnected          = false;       // Not connected
   m_bJsonMeasurementAdd = true;        // Add measurement block to JSON publish event
   m_bindInterface       = "";          // No bind interface
@@ -663,14 +677,7 @@ vscpClientMqtt::vscpClientMqtt(void)
     return;
   }
 
-#ifdef WIN32
-  m_semReceiveQueue = CreateSemaphore(NULL, 0, 0x7fffffff, NULL);
-#else
-  sem_init(&m_semReceiveQueue, 0, 0);
-#endif
-
-  pthread_mutex_init(&m_mutexif, NULL);
-  pthread_mutex_init(&m_mutexReceiveQueue, NULL);
+  pthread_mutex_init(&m_mutexif, nullptr);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -689,20 +696,13 @@ vscpClientMqtt::~vscpClientMqtt()
   // Clean up the lib
   mosquitto_lib_cleanup();
 
-#ifdef WIN32
-  CloseHandle(m_semReceiveQueue);
-#else
-  sem_destroy(&m_semReceiveQueue);
-#endif    
-
   pthread_mutex_destroy(&m_mutexif);
-  pthread_mutex_destroy(&m_mutexReceiveQueue);
 
   vscpEvent *pev = nullptr;
   while (m_receiveQueue.size()) {
     pev = m_receiveQueue.front();
     m_receiveQueue.pop_front();
-    vscp_deleteEvent(pev);
+    vscp_deleteEvent_v2(&pev);
   }
 
   // Delete subscription objects
@@ -1299,8 +1299,8 @@ vscpClientMqtt::initFromJson(const std::string &config)
           addSubscription(topic, format, qos, v5_options);
 
         } // object
-      } // for
-    } // sub
+      }   // for
+    }     // sub
 
     if (j.contains("bescape-pub-topics") && j["bescape-pub-topics"].is_boolean()) {
       m_bEscapesPubTopics = j["bescape-pub-topics"].get<bool>();
@@ -1359,39 +1359,38 @@ vscpClientMqtt::initFromJson(const std::string &config)
           }
 
           if (pubobj.contains("format") && pubobj["format"].is_number()) {
-            format = static_cast<enumMqttMsgFormat>(pubobj["format"].get<int>());
-          }
-          else if (pubobj.contains("format") && pubobj["format"].is_string()) {
-            std::string str = pubobj["format"].get<std::string>();
-            vscp_makeLower(str);
 
-            if (std::string::npos != str.find("binary")) {
-              spdlog::debug("MQTT CLIENT: json mqtt init: 'publish obj format' Set to BINARY.");
-              format = binfmt;
-            }
-            else if (std::string::npos != str.find("string")) {
-              spdlog::debug("MQTT CLIENT: json mqtt init: 'publish obj format' Set to STRING.");
-              format = strfmt;
-            }
-            else if (std::string::npos != str.find("json")) {
-              spdlog::debug("MQTT CLIENT: json mqtt init: 'publish obj format' Set to JSON.");
-              format = jsonfmt;
-            }
-            else if (std::string::npos != str.find("xml")) {
-              spdlog::debug("MQTT CLIENT: json mqtt init: 'publish obj format' Set to XML.");
-              format = xmlfmt;
-            }
-            else {
-              spdlog::error("MQTT CLIENT: json mqtt init: 'publish obj format' Ivalid value. Set to JSON.");
-              format = jsonfmt;
-            }
+            format = static_cast<enumMqttMsgFormat>(pubobj["format"].get<int>());
+
+            // vscp_makeLower(str);
+            //  std::string str;
+            //  if (std::string::npos != str.find("binary")) {
+            //    spdlog::debug("MQTT CLIENT: json mqtt init: 'publish obj format' Set to BINARY.");
+            //    format = binfmt;
+            //  }
+            //  else if (std::string::npos != str.find("string")) {
+            //    spdlog::debug("MQTT CLIENT: json mqtt init: 'publish obj format' Set to STRING.");
+            //    format = strfmt;
+            //  }
+            //  else if (std::string::npos != str.find("json")) {
+            //    spdlog::debug("MQTT CLIENT: json mqtt init: 'publish obj format' Set to JSON.");
+            //    format = jsonfmt;
+            //  }
+            //  else if (std::string::npos != str.find("xml")) {
+            //    spdlog::debug("MQTT CLIENT: json mqtt init: 'publish obj format' Set to XML.");
+            //    format = xmlfmt;
+            //  }
+            //  else {
+            //    spdlog::error("MQTT CLIENT: json mqtt init: 'publish obj format' Ivalid value. Set to JSON.");
+            //    format = jsonfmt;
+            //  }
           }
 
           addPublish(topic, format, qos, bretain);
 
         } // obj
-      } // for
-    } // pub
+      }   // for
+    }     // pub
 
     // v5
     if (j.contains("v5") && j["v5"].is_object()) {
@@ -1533,14 +1532,7 @@ vscpClientMqtt::handleMessage(const struct mosquitto_message *pmsg)
 
       // Save event in incoming queue
       if (m_receiveQueue.size() < MQTT_MAX_INQUEUE_SIZE) {
-        pthread_mutex_lock(&m_mutexReceiveQueue);
         m_receiveQueue.push_back(pEvent);
-#ifdef WIN32
-        ReleaseSemaphore(m_semReceiveQueue, 1, NULL);
-#else        
-        sem_post(&m_semReceiveQueue);
-#endif        
-        pthread_mutex_unlock(&m_mutexReceiveQueue);
       }
     }
   }
@@ -1579,14 +1571,7 @@ vscpClientMqtt::handleMessage(const struct mosquitto_message *pmsg)
 
       // Save event in incoming queue
       if (m_receiveQueue.size() < MQTT_MAX_INQUEUE_SIZE) {
-        pthread_mutex_lock(&m_mutexReceiveQueue);
         m_receiveQueue.push_back(pEvent);
-#ifdef WIN32
-        ReleaseSemaphore(m_semReceiveQueue, 1, NULL);
-#else        
-        sem_post(&m_semReceiveQueue);
-#endif
-        pthread_mutex_unlock(&m_mutexReceiveQueue);
       }
     }
   }
@@ -1625,14 +1610,7 @@ vscpClientMqtt::handleMessage(const struct mosquitto_message *pmsg)
 
       // Save event in incoming queue
       if (m_receiveQueue.size() < MQTT_MAX_INQUEUE_SIZE) {
-        pthread_mutex_lock(&m_mutexReceiveQueue);
         m_receiveQueue.push_back(pEvent);
-#ifdef WIN32
-        ReleaseSemaphore(m_semReceiveQueue, 1, NULL);
-#else        
-        sem_post(&m_semReceiveQueue);
-#endif
-        pthread_mutex_unlock(&m_mutexReceiveQueue);
       }
     }
   }
@@ -1674,14 +1652,7 @@ vscpClientMqtt::handleMessage(const struct mosquitto_message *pmsg)
 
       // Save event in incoming queue
       if (m_receiveQueue.size() < MQTT_MAX_INQUEUE_SIZE) {
-        pthread_mutex_lock(&m_mutexReceiveQueue);
         m_receiveQueue.push_back(pEvent);
-#ifdef WIN32
-        ReleaseSemaphore(m_semReceiveQueue, 1, NULL);
-#else        
-        sem_post(&m_semReceiveQueue);
-#endif
-        pthread_mutex_unlock(&m_mutexReceiveQueue);
       }
     }
   }
@@ -2120,6 +2091,30 @@ vscpClientMqtt::connect(void)
     }
   }
 
+  // Start worker thread if a callback has been defined
+  if (isCallbackEvActive()|| isCallbackExActive()) {
+    int rv = pthread_create(&m_tid, nullptr, workerThread, this);
+    switch (rv) {
+
+      case EAGAIN:
+        spdlog::error(
+          "MQTT CLIENT: Failed to start MQTT callback thread - Insufficient resources to create another thread.");
+        break;
+
+      case EINVAL:
+        spdlog::error("MQTT CLIENT: Failed to start MQTT callback thread - Invalid settings in attr");
+        break;
+
+      case EPERM:
+        spdlog::error("MQTT CLIENT: Failed to start MQTT callback thread - No permission to set the scheduling policy");
+        break;
+
+      default:
+        spdlog::debug("MQTT CLIENT: Started MQTT callback thread");
+        break;
+    }
+  }
+
   return VSCP_ERROR_SUCCESS;
 }
 
@@ -2239,7 +2234,7 @@ vscpClientMqtt::send(vscpEvent &ev)
             spdlog::error("MQTT CLIENT: sendEvent: Failed to add measurement info to event.");
           }
         } // OK to insert extra info
-      } // is measurement
+      }   // is measurement
 
       lenPayload = strPayload.length();
       strncpy((char *) payload, strPayload.c_str(), lenPayload);
@@ -2425,7 +2420,7 @@ vscpClientMqtt::send(vscpEvent &ev)
                                                     ppublish->getQos(),
                                                     ppublish->getRetain()))) {
       spdlog::error("MQTT CLIENT: sendEvent: mosquitto_publish (ev) failed. rv={0} {1}", rv, mosquitto_strerror(rv));
-      // printf("mosquitto_publish: %s\n", mosquitto_strerror(rv));
+      printf("mosquitto_publish: %s\n", mosquitto_strerror(rv));
     }
 
   } // for each topic
@@ -2497,7 +2492,7 @@ vscpClientMqtt::send(vscpEventEx &ex)
             spdlog::error("MQTT CLIENT: sendEvent: Failed to add measurement info to event.");
           }
         } // OK to insert extra info
-      } // is measurement
+      }   // is measurement
 
       lenPayload = strPayload.length();
       strncpy((char *) payload, strPayload.c_str(), sizeof(payload));
@@ -2803,63 +2798,6 @@ vscpClientMqtt::receive(canalMsg &msg)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// receiveBlocking
-//
-
-int
-vscpClientMqtt::receiveBlocking(vscpEvent &ev, long timeout)
-{
-  if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
-    if (errno == ETIMEDOUT) {
-      return VSCP_ERROR_TIMEOUT;
-    }
-    else {
-      return VSCP_ERROR_ERROR;
-    }
-  }
-
-  return receive(ev);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// receiveBlocking
-//
-
-int
-vscpClientMqtt::receiveBlocking(vscpEventEx &ex, long timeout)
-{
-  if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
-    if (errno == ETIMEDOUT) {
-      return VSCP_ERROR_TIMEOUT;
-    }
-    else {
-      return VSCP_ERROR_ERROR;
-    }
-  }
-
-  return receive(ex);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// receiveBlocking
-//
-
-int
-vscpClientMqtt::receiveBlocking(canalMsg &msg, long timeout)
-{
-  if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
-    if (errno == ETIMEDOUT) {
-      return VSCP_ERROR_TIMEOUT;
-    }
-    else {
-      return VSCP_ERROR_ERROR;
-    }
-  }
-
-  return receive(msg);
-}
-
-///////////////////////////////////////////////////////////////////////////////
 // setfilter
 //
 
@@ -2936,8 +2874,9 @@ vscpClientMqtt::getversion(uint8_t *pmajor, uint8_t *pminor, uint8_t *prelease, 
 //
 
 int
-vscpClientMqtt::getinterfaces(std::deque<std::string> & /*iflist*/)
+vscpClientMqtt::getinterfaces(std::deque<std::string> &iflist)
 {
+  unused(iflist);
   // No interfaces available
   return VSCP_ERROR_SUCCESS;
 }
@@ -3023,3 +2962,58 @@ win_usleep(__int64 usec)
   CloseHandle(timer);
 }
 #endif
+
+///////////////////////////////////////////////////////////////////////////////
+// Callback workerthread
+//
+// This thread call the appropriate callback when events are received
+//
+
+static void *
+workerThread(void *pObj)
+{
+  //uint8_t guid[]          = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+  vscpClientMqtt *pClient = (vscpClientMqtt *) pObj;
+  //  if (nullptr == pif) return nullptr;
+
+  while (pClient->m_bRun) {
+
+    //  pthread_mutex_lock(&pif->m_mutexif);
+
+    // Check if there are events to fetch
+    // int cnt;
+    /* if ((cnt = pClient->m_canalif.CanalDataAvailable())) {
+
+        while (cnt) {
+            canalMsg msg;
+            if ( CANAL_ERROR_SUCCESS ==
+    pClient->m_canalif.CanalReceive(&msg) ) { if ( nullptr !=
+    pClient->m_evcallback ) { vscpEvent ev; if
+    (vscp_convertCanalToEvent(&ev, &msg, guid) ) {
+                        pClient->m_evcallback(ev);
+                    }
+                }
+                if ( nullptr != pClient->m_excallback ) {
+                    vscpEventEx ex;
+                    if (vscp_convertCanalToEventEx(&ex,
+                                                    &msg,
+                                                    guid) ) {
+                        pClient->m_excallback(ex);
+                    }
+                }
+            }
+            cnt--;
+        }
+
+    } */
+
+    //  pthread_mutex_unlock(&pif->m_mutexif);
+#ifndef WIN32
+    usleep(200);
+#else
+    win_usleep(200);
+#endif
+  }
+
+  return nullptr;
+}

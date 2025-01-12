@@ -7,7 +7,7 @@
 //
 // This file is part of the VSCP (https://www.vscp.org)
 //
-// Copyright:  (C) 2007-2025
+// Copyright:  (C) 2007-2024
 // Ake Hedman, the VSCP project, <info@vscp.org>
 //
 // This file is distributed in the hope that it will be useful,
@@ -43,6 +43,8 @@
 #include <iostream>
 #include <iomanip> 
 #include <sstream> 
+
+#define unused(x) ((void)x)
 
 ///////////////////////////////////////////////////////////////////////////////
 // Constructor
@@ -228,12 +230,15 @@ CBootDevice_PIC1::deviceInfo(void)
 //
 
 int
-CBootDevice_PIC1::deviceInit(cguid& ourguid, uint16_t /*devicecode*/, bool bAbortOnFirmwareCodeFail)
+CBootDevice_PIC1::deviceInit(cguid& ourguid, uint16_t devicecode, bool bAbortOnFirmwareCodeFail)
 {
   int rv;
 
   // Save our local GUID
   m_ourguid = ourguid;
+
+  // Save Firmware device code 
+  m_firmwaredeviceCode = devicecode;
 
   /*
     First do a test to see if the device is already in boot mode
@@ -664,11 +669,13 @@ CBootDevice_PIC1::checkResponseLevel1(uint32_t response_id)
 //
 
 int
-CBootDevice_PIC1::checkResponseLevel2(uint32_t /*id*/)
+CBootDevice_PIC1::checkResponseLevel2(uint32_t id)
 {
   int rv;
   vscpEventEx ex;
   time_t tstart, tnow;
+
+  unused(id);
 
   // Get system time
   time(&tstart);
@@ -757,7 +764,7 @@ CBootDevice_PIC1::writeFirmwareSector(uint8_t *paddr)
 
     // Put data into frame
     for (int i = 0; i < 8; i++) {
-      ex.data[i+offset] = paddr[i];
+      msg.data[i + offset] = paddr[i];
       m_checksum += paddr[i];
     };
 
@@ -828,7 +835,7 @@ CBootDevice_PIC1::writeFirmwareBlock(uint32_t start, uint32_t end)
     }
 
     // Init the block
-    if (VSCP_ERROR_SUCCESS != (rv = fillMemoryBuffer(pbuf, size, start, end))) {
+    if (VSCP_ERROR_SUCCESS != (rv = fillMemoryBuffer(pbuf, size, start))) {
       spdlog::error("writeFirmwareBlock: Failed to fill code block with data.");
       if (nullptr != m_statusCallback) {
         m_statusCallback(-1,
@@ -877,7 +884,7 @@ CBootDevice_PIC1::writeFirmwareBlock(uint32_t start, uint32_t end)
 //
 
 int
-CBootDevice_PIC1::deviceLoad(std::function<void(int, const char *)> /*statusCallback*/, bool /*bAbortOnFirmwareCodeFail*/)
+CBootDevice_PIC1::deviceLoad(std::function<void(int, const char *)> statusCallback, bool bAbortOnFirmwareCodeFail)
 {
   //bool bRun = true;
   int rv;
@@ -891,6 +898,9 @@ CBootDevice_PIC1::deviceLoad(std::function<void(int, const char *)> /*statusCall
   //uint32_t nPackets;
   // uint32_t minAddr;
   // uint32_t maxAddr;
+
+  unused(statusCallback);
+  unused(bAbortOnFirmwareCodeFail);
 
   if (nullptr != m_statusCallback) {
     m_statusCallback(0, "Starting firmware download");

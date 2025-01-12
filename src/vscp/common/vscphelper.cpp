@@ -4,7 +4,7 @@
 //
 // The MIT License (MIT)
 //
-// Copyright (C) 2000-2025 Ake Hedman, the VSCP project
+// Copyright (C) 2000-2024 Ake Hedman, the VSCP project
 // <info@vscp.org>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -68,7 +68,6 @@
 #include <vscpmd5.h>
 
 #include <guid.h>
-// #include <mdf.h>
 #include <vscp.h>
 #include <vscphelper.h>
 
@@ -122,6 +121,8 @@ using namespace std;
 
 // https://github.com/nlohmann/json
 using json = nlohmann::json;
+
+#define unused(x) ((void)x)
 
 // ***************************************************************************
 //                              General Helpers
@@ -251,25 +252,7 @@ vscp_mem_usage(double &vm_usage, double &resident_set)
 // vscp_sem_wait
 //
 
-#ifdef WIN32
-int
-vscp_sem_wait(HANDLE *phHandle, uint32_t waitms)
-{
-  int rv;
-
-  DWORD dwrv = WaitForSingleObject(*phHandle, waitms);
-  if (WAIT_OBJECT_0 == dwrv) {
-    rv= 0;
-  }
-  else if (WAIT_TIMEOUT == dwrv) {
-    rv = ETIMEDOUT;
-  }
-  else {
-    rv = -1;
-  }
-  return rv;
-}
-#else
+#ifndef WIN32
 int
 vscp_sem_wait(sem_t *sem, uint32_t waitms)
 {
@@ -290,22 +273,6 @@ vscp_sem_wait(sem_t *sem, uint32_t waitms)
   ts.tv_nsec = ns % 1000000000;
 
   return sem_timedwait(sem, &ts);
-}
-#endif
-
-#ifdef WIN32
-static void
-vscp_usleep(__int64 usec)
-{
-  HANDLE timer;
-  LARGE_INTEGER ft;
-
-  ft.QuadPart = -(10 * usec); // Convert to 100 nanosecond interval, negative value indicates relative time
-
-  timer = CreateWaitableTimer(nullptr, TRUE, nullptr);
-  SetWaitableTimer(timer, &ft, 0, nullptr, nullptr, 0);
-  WaitForSingleObject(timer, INFINITE);
-  CloseHandle(timer);
 }
 #endif
 
@@ -893,8 +860,11 @@ vscp_safe_encode_str(const std::string &str)
 //
 
 bool
-vscp_XML_Escape(char * /*dst*/, size_t /*dst_len*/, const char * /*src*/)
+vscp_XML_Escape(char *dst, size_t dst_len, const char *src)
 {
+  unused(dst);
+  unused(dst_len);
+  unused(src);
   /*const char escapeCharTbl[6]      = { '&', '\'', '\"', '>', '<', '\0' };
   const char *const escapeSeqTbl[] = {
       "&amp;", "&apos;", "&quot;", "&gt;", "&lt;",
@@ -907,7 +877,7 @@ vscp_XML_Escape(char * /*dst*/, size_t /*dst_len*/, const char * /*src*/)
   unsigned int str_len = strlen( src );
   int nShifts = 0;
 
-  // ******  TODO TODP TODO TODO
+  // ******  TODO TODO TODO TODO
 
 
   // Go through string
@@ -1844,9 +1814,10 @@ vscp_getMeasurementFloat64AsString(std::string &strValue, const vscpEvent *pEven
 //
 
 bool
-vscp_getMeasurementWithZoneAsString(const vscpEvent *pEvent, std::string & /*strValue*/)
+vscp_getMeasurementWithZoneAsString(const vscpEvent *pEvent, std::string &strValue)
 {
   int offset = 0;
+  unused(strValue);
 
   // If class >= 512 and class <1024 we
   // have GUID in front of data.
@@ -2451,13 +2422,15 @@ bool
 vscp_convertIntegerToNormalizedEventData(uint8_t *pdata,
                                          uint16_t *psize,
                                          uint64_t val64,
-                                         uint8_t /*unit*/,
-                                         uint8_t /*sensoridx*/)
+                                         uint8_t unit,
+                                         uint8_t sensoridx)
 {
   uint8_t i;
   uint8_t data[8];
 
   uint8_t *p = (uint8_t *) &val64;
+  unused(sensoridx);
+  unused(unit);
 
   if (vscp_isLittleEndian()) {
     for (i = 7; i > 0; i--) {
@@ -2493,7 +2466,7 @@ vscp_convertIntegerToNormalizedEventData(uint8_t *pdata,
 bool
 vscp_makeIntegerMeasurementEvent(vscpEvent *pEvent, int64_t value, uint8_t unit, uint8_t sensoridx)
 {
-  uint8_t offset = 0;
+  //uint8_t offset = 0;
   uint8_t data[8];
 
   // Check pointer
@@ -2610,7 +2583,7 @@ vscp_makeIntegerMeasurementEvent(vscpEvent *pEvent, int64_t value, uint8_t unit,
 
   // Allocate data as needed
   if ((nullptr == pEvent->pdata) && (VSCP_CLASS1_MEASUREMENT == pEvent->vscp_class)) {
-    offset        = 0;
+    //offset        = 0;
     pEvent->pdata = new uint8_t[pEvent->sizeData];
     if (nullptr == pEvent->pdata) {
       return false;
@@ -2618,7 +2591,7 @@ vscp_makeIntegerMeasurementEvent(vscpEvent *pEvent, int64_t value, uint8_t unit,
     memcpy(pEvent->pdata, data, pEvent->sizeData);
   }
   else if ((nullptr == pEvent->pdata) && (VSCP_CLASS2_LEVEL1_MEASUREMENT == pEvent->vscp_class)) {
-    offset        = 16;
+    //offset        = 16;
     pEvent->pdata = new uint8_t[16 + pEvent->sizeData];
     if (nullptr == pEvent->pdata) {
       return false;
@@ -4829,8 +4802,10 @@ startEventXMLParser(void *data, const char *name, const char **attr)
 }
 
 static void
-endEventXMLParser(void * /*data*/, const char * /*name*/)
+endEventXMLParser(void *data, const char *name)
 {
+  unused(data);
+  unused(name);
   depth_event_parser--;
 }
 
@@ -4976,8 +4951,10 @@ startEventExXMLParser(void *data, const char *name, const char **attr)
 }
 
 static void
-endEventExXMLParser(void * /*data*/, const char * /*name*/)
+endEventExXMLParser(void *data, const char *name)
 {
+  unused(data);
+  unused(name);
   depth_eventex_parser--;
 }
 
@@ -5658,8 +5635,10 @@ startFilterMaskXMLParser(void *data, const char *name, const char **attr)
 }
 
 static void
-endFilterMaskXMLParser(void * /*data*/, const char * /*name*/)
+endFilterMaskXMLParser(void *data, const char *name)
 {
+  unused(data);
+  unused(name);
   depth_filtermask_parser--;
 }
 
@@ -5921,11 +5900,12 @@ vscp_convertCanalToEventEx(vscpEventEx *pvscpEventEx, const canalMsg *pcanalMsg,
 //
 
 bool
-vscp_convertEventToCanal(canalMsg *pcanalMsg, const vscpEvent *pvscpEvent, uint8_t /*mode*/)
+vscp_convertEventToCanal(canalMsg *pcanalMsg, const vscpEvent *pvscpEvent, uint8_t mode)
 {
   unsigned char nodeid = 0;
   short sizeData       = 0;
   uint16_t vscp_class  = 0;
+  unused(mode);
 
   // Check pointers
   if (nullptr == pcanalMsg) {
@@ -5996,9 +5976,10 @@ vscp_convertEventToCanal(canalMsg *pcanalMsg, const vscpEvent *pvscpEvent, uint8
 //
 
 bool
-vscp_convertEventExToCanal(canalMsg *pcanalMsg, const vscpEventEx *pvscpEventEx, uint8_t /*mode*/)
+vscp_convertEventExToCanal(canalMsg *pcanalMsg, const vscpEventEx *pvscpEventEx, uint8_t mode)
 {
   bool rv;
+  unused(mode); 
 
   if (nullptr == pcanalMsg) {
     return false;

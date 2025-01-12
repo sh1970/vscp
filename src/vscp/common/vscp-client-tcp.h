@@ -9,7 +9,7 @@
 //
 // This file is part of the VSCP (https://www.vscp.org)
 //
-// Copyright:  (C) 2007-2025
+// Copyright:  (C) 2007-2024
 // Ake Hedman, the VSCP project, <info@vscp.org>
 //
 // This file is distributed in the hope that it will be useful,
@@ -44,8 +44,8 @@ public:
           tcp:// or stcp:// (SSL connection)
       @param strUsername Username used to login on remote host.
       @param strPassword Password used to login on remote host.
-      @param bPolling If true only one connection will be opened to the remote server
-          on which polling for events will be done. If false one connection will be opened
+      @param bPolling If true only one connection will be opended to the remote server
+          on which polling for events will be done. If false one connection will be opended
           for send and one for receive. The polling is intended for low end devices which
           only accepts one client at the time.
       @return Return VSCP_ERROR_SUCCESS of OK and error code else.
@@ -99,40 +99,16 @@ public:
   virtual int receive(vscpEvent &ev);
 
   /*!
-      Blocking receive of VSCP event ex from remote host
-      @param ev VSCP event ex that will get the result.
-      @param timeout Timeout in milliseconds. Default is 100 ms.
-      @return Return VSCP_ERROR_SUCCESS of OK and error code else.
-  */
-  virtual int receiveBlocking(vscpEvent &ev, long timeout = 100);
-
-  /*!
       Receive VSCP event ex from remote host
       @return Return VSCP_ERROR_SUCCESS of OK and error code else.
   */
   virtual int receive(vscpEventEx &ex);
 
   /*!
-      Blocking receive of VSCP event ex from remote host
-      @param ex VSCP event ex that will get the result.
-      @param timeout Timeout in milliseconds. Default is 100 ms.
-      @return Return VSCP_ERROR_SUCCESS of OK and error code else.
-  */
-  virtual int receiveBlocking(vscpEventEx &ex, long timeout = 100);
-
-  /*!
     Receive CAN(AL) message from remote host
     @return Return VSCP_ERROR_SUCCESS of OK and error code else.
 */
   virtual int receive(canalMsg &msg);
-
-  /*!
-      Receive blocking CAN(AL) message from remote host
-      @param msg CANAL message that will get the result.
-      @param timeout Timeout in milliseconds. Default is 100 ms.
-      @return Return VSCP_ERROR_SUCCESS of OK and error code else.
-  */
-  virtual int receiveBlocking(canalMsg &msg, long timeout = 100);
 
   /*!
       Set interface filter
@@ -257,32 +233,11 @@ public:
   void sendToCallbacks(vscpEvent *pev);
 
 public:
-  /// Flag for worker thread run as long it's true
+  /// Flag for workerthread run as long it's true
   bool m_bRun;
 
-  // Event lists
-  // std::list<vscpEvent *> m_sendList;
-  std::list<vscpEvent *> m_receiveList;
-
-  /// Mutex to protect receive tcp/ip object
-  pthread_mutex_t m_mutexTcpIpObject;
-
-  /// Mutex to protect receive queue
-  pthread_mutex_t m_mutexReceiveQueue;
-
-  /*!
-    Event object to indicate that there is an event in the
-    output queue
-  */
-  #ifdef WIN32
- HANDLE m_semReceiveQueue;
- #else  
-  sem_t m_semReceiveQueue;
- #endif
-
-  /// Filters for input/output
-  vscpEventFilter m_filterIn;
-  vscpEventFilter m_filterOut;
+  /// Mutex to protect receive tcop/ip object
+  std::mutex m_mutexReceive;
 
   /// Used for channel id (prevent sent events from being received)
   uint32_t m_obid;
@@ -290,7 +245,7 @@ public:
 private:
   /*!
       The main interface (sending) is always opened (both in poll and
-      standard mode). The Receive interface is opened only in normal mode
+      standard mode). The Receive interface is opended only in normal mode
       and do just connect - log in - enable receive loop. Received events
       will be sent on the defined callbacks.
   */
@@ -301,12 +256,11 @@ private:
   /// Receiving interface
   VscpRemoteTcpIf m_tcpReceive;
 
+  // Filter used for both channels
+  vscpEventFilter m_filter;
+
   // Interface on remote host
   cguid m_guidif;
-
-  // ------------------------------------------------------------------------
-
-  
 
   /// Workerthread
   std::thread *m_pworkerthread;
@@ -327,8 +281,6 @@ private:
 
   /// If true the remote host interface will be polled.
   bool m_bPolling;
-
-  
 
   // ------------------------------------------------------------------------
   //                                 TLS / SSL

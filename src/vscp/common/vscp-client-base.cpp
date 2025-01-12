@@ -9,7 +9,7 @@
 //
 // This file is part of the VSCP (https://www.vscp.org)
 //
-// Copyright © 2000-2025 Ake Hedman, Grodans Paradis AB
+// Copyright © 2000-2024 Ake Hedman, Grodans Paradis AB
 // <info@grodansparadis.com>
 //
 // This file is distributed in the hope that it will be useful,
@@ -35,7 +35,6 @@
 #include <list>
 #include <string>
 
-#include <vscphelper.h>
 #include "vscp-client-base.h"
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -86,4 +85,3 @@ CVscpClient::setCallbackEx(std::function<void(vscpEventEx &ex, void *pobj)> call
   
   return VSCP_ERROR_SUCCESS;
 };
-

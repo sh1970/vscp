@@ -9,7 +9,7 @@
 //
 // This file is part of the VSCP (https://www.vscp.org)
 //
-// Copyright:   (C) 2007-2025
+// Copyright:   (C) 2007-2023
 // Ake Hedman, the VSCP project, <info@vscp.org>
 //
 // This file is distributed in the hope that it will be useful,
@@ -27,18 +27,19 @@
 #include <pch.h>
 #endif
 
-#include "vscphelper.h"
 #include "vscp-client-multicast.h"
+#include "vscphelper.h"
 
-#define unused(x) ((void)x)
+#define unused(x) ((void) x)
 
 ///////////////////////////////////////////////////////////////////////////////
 // CTor
 //
 
-vscpClientMulticast::vscpClientMulticast() : CVscpClient()
+vscpClientMulticast::vscpClientMulticast()
+  : CVscpClient()
 {
-    m_type = CVscpClient::connType::MULTICAST;
+  m_type = CVscpClient::connType::MULTICAST;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -47,74 +48,82 @@ vscpClientMulticast::vscpClientMulticast() : CVscpClient()
 
 vscpClientMulticast::~vscpClientMulticast()
 {
-    ;
+  ;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // getConfigAsJson
 //
 
-std::string vscpClientMulticast::getConfigAsJson(void) 
+std::string
+vscpClientMulticast::getConfigAsJson(void)
 {
-    std::string rv;
+  std::string rv;
 
-    return rv;
+  return rv;
 }
-
 
 ///////////////////////////////////////////////////////////////////////////////
 // initFromJson
 //
 
-bool vscpClientMulticast::initFromJson(const std::string& /*config*/)
+bool
+vscpClientMulticast::initFromJson(const std::string &config)
 {
-    return true;
+  unused(config);
+  return true;
 }
-
 
 ///////////////////////////////////////////////////////////////////////////////
 // connect
 //
 
-int vscpClientMulticast::connect(void)
+int
+vscpClientMulticast::connect(void)
 {
-    return VSCP_ERROR_SUCCESS;
+  return VSCP_ERROR_SUCCESS;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // disconnect
 //
 
-int vscpClientMulticast::disconnect(void)
+int
+vscpClientMulticast::disconnect(void)
 {
-    return VSCP_ERROR_SUCCESS;
+  return VSCP_ERROR_SUCCESS;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // isConnected
 //
 
-bool vscpClientMulticast::isConnected(void)
+bool
+vscpClientMulticast::isConnected(void)
 {
-    return true;
+  return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // send
 //
 
-int vscpClientMulticast::send(vscpEvent & /*ev*/)
+int
+vscpClientMulticast::send(vscpEvent &ev)
 {
-    return VSCP_ERROR_SUCCESS;
+  unused(ev);
+  return VSCP_ERROR_SUCCESS;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // send
 //
 
-int vscpClientMulticast::send(vscpEventEx & /*ex*/)
+int
+vscpClientMulticast::send(vscpEventEx &ex)
 {
-    return VSCP_ERROR_SUCCESS;
+  unused(ex);
+  return VSCP_ERROR_SUCCESS;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -138,25 +147,29 @@ vscpClientMulticast::send(canalMsg &msg)
 // receive
 //
 
-int vscpClientMulticast::receive(vscpEvent & /*ev*/)
+int
+vscpClientMulticast::receive(vscpEvent &ev)
 {
-    return VSCP_ERROR_SUCCESS;
+  unused(ev);
+  return VSCP_ERROR_SUCCESS;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // receive
 //
 
-int vscpClientMulticast::receive(vscpEventEx & /*ex*/)
+int
+vscpClientMulticast::receive(vscpEventEx &ex)
 {
-    return VSCP_ERROR_SUCCESS;
+  unused(ex);
+  return VSCP_ERROR_SUCCESS;
 }
 
 //////////////////////////////////////////////////////////////////////////////
 // receive
 //
-  
-int  
+
+int
 vscpClientMulticast::receive(canalMsg &msg)
 {
   int rv;
@@ -171,164 +184,117 @@ vscpClientMulticast::receive(canalMsg &msg)
   }
 
   return VSCP_ERROR_SUCCESS;
-} 
-
-///////////////////////////////////////////////////////////////////////////////
-// receiveBlocking
-//
-
-int
-vscpClientMulticast::receiveBlocking(vscpEvent &ev, long timeout)
-{
-  unused(timeout);
-  // if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
-  //   if (errno == ETIMEDOUT) {
-  //     return VSCP_ERROR_TIMEOUT;
-  //   }
-  //   else {
-  //     return VSCP_ERROR_ERROR;
-  //   }
-  // }
-
-  return receive(ev);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// receiveBlocking
-//
-
-int
-vscpClientMulticast::receiveBlocking(vscpEventEx &ex, long timeout)
-{
-  unused(timeout);
-  // if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
-  //   if (errno == ETIMEDOUT) {
-  //     return VSCP_ERROR_TIMEOUT;
-  //   }
-  //   else {
-  //     return VSCP_ERROR_ERROR;
-  //   }
-  // }
-
-  return receive(ex);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// receiveBlocking
-//
-
-int
-vscpClientMulticast::receiveBlocking(canalMsg &msg, long timeout)
-{
-  unused(timeout);
-  // if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
-  //   if (errno == ETIMEDOUT) {
-  //     return VSCP_ERROR_TIMEOUT;
-  //   }
-  //   else {
-  //     return VSCP_ERROR_ERROR;
-  //   }
-  // }
-
-  return receive(msg);
 }
 
 //////////////////////////////////////////////////////////////////////////////
 // setfilter
 //
 
-int vscpClientMulticast::setfilter(vscpEventFilter & /*filter*/)
+int
+vscpClientMulticast::setfilter(vscpEventFilter &filter)
 {
-    return VSCP_ERROR_SUCCESS;
+  unused(filter);
+  return VSCP_ERROR_SUCCESS;
 }
-
 //////////////////////////////////////////////////////////////////////////////
 // getcount
 //
 
-int vscpClientMulticast::getcount(uint16_t *pcount)
+int
+vscpClientMulticast::getcount(uint16_t *pcount)
 {
-    if (NULL == pcount ) return VSCP_ERROR_INVALID_POINTER;
-    *pcount = 0;
-    return VSCP_ERROR_SUCCESS;
+  if (NULL == pcount)
+    return VSCP_ERROR_INVALID_POINTER;
+  *pcount = 0;
+  return VSCP_ERROR_SUCCESS;
 }
 
 //////////////////////////////////////////////////////////////////////////////
 // clear
 //
 
-int vscpClientMulticast::clear()
+int
+vscpClientMulticast::clear()
 {
-    return VSCP_ERROR_SUCCESS;
+  return VSCP_ERROR_SUCCESS;
 }
 
 //////////////////////////////////////////////////////////////////////////////
 // getversion
 //
 
-int vscpClientMulticast::getversion(uint8_t *pmajor,
-                                uint8_t *pminor,
-                                uint8_t *prelease,
-                                uint8_t *pbuild)
+int
+vscpClientMulticast::getversion(uint8_t *pmajor, uint8_t *pminor, uint8_t *prelease, uint8_t *pbuild)
 {
-    if (NULL == pmajor ) return VSCP_ERROR_INVALID_POINTER;
-    if (NULL == pminor ) return VSCP_ERROR_INVALID_POINTER;
-    if (NULL == prelease ) return VSCP_ERROR_INVALID_POINTER;
-    if (NULL == pbuild ) return VSCP_ERROR_INVALID_POINTER;
-    return VSCP_ERROR_SUCCESS;
+  if (NULL == pmajor)
+    return VSCP_ERROR_INVALID_POINTER;
+  if (NULL == pminor)
+    return VSCP_ERROR_INVALID_POINTER;
+  if (NULL == prelease)
+    return VSCP_ERROR_INVALID_POINTER;
+  if (NULL == pbuild)
+    return VSCP_ERROR_INVALID_POINTER;
+  return VSCP_ERROR_SUCCESS;
 }
 
 //////////////////////////////////////////////////////////////////////////////
 // getinterfaces
 //
 
-int vscpClientMulticast::getinterfaces(std::deque<std::string> & /*iflist*/)
+int
+vscpClientMulticast::getinterfaces(std::deque<std::string> &iflist)
 {
-    return VSCP_ERROR_SUCCESS;
+  unused(iflist);
+  return VSCP_ERROR_SUCCESS;
 }
 
 //////////////////////////////////////////////////////////////////////////////
 // getwcyd
 //
 
-int vscpClientMulticast::getwcyd(uint64_t & /*wcyd*/)
+int
+vscpClientMulticast::getwcyd(uint64_t &wcyd)
 {
-    return VSCP_ERROR_SUCCESS;
+  unused(wcyd);
+  return VSCP_ERROR_SUCCESS;
 }
 
 //////////////////////////////////////////////////////////////////////////////
 // setConnectionTimeout
 //
 
-void vscpClientMulticast::setConnectionTimeout(uint32_t /*timeout*/)
+void
+vscpClientMulticast::setConnectionTimeout(uint32_t timeout)
 {
-    ;
+  unused(timeout);
 }
 
 //////////////////////////////////////////////////////////////////////////////
 // getConnectionTimeout
 //
 
-uint32_t vscpClientMulticast::getConnectionTimeout(void)
+uint32_t
+vscpClientMulticast::getConnectionTimeout(void)
 {
-    return 0;
+  return 0;
 }
 
 //////////////////////////////////////////////////////////////////////////////
 // setResponseTimeout
 //
 
-void vscpClientMulticast::setResponseTimeout(uint32_t /*timeout*/)
+void
+vscpClientMulticast::setResponseTimeout(uint32_t timeout)
 {
-    ;
+  unused(timeout);
 }
 
 //////////////////////////////////////////////////////////////////////////////
 // getResponseTimeout
 //
 
-uint32_t vscpClientMulticast::getResponseTimeout(void)
+uint32_t
+vscpClientMulticast::getResponseTimeout(void)
 {
-    return 0;
+  return 0;
 }
-

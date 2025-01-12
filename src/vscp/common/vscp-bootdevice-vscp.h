@@ -8,7 +8,7 @@
 //
 // This file is part of the VSCP (https://www.vscp.org)
 //
-// Copyright:  (C) 2000-2025
+// Copyright:  (C) 2000-2024
 // Ake Hedman, the VSCP project, <info@vscp.org>
 //
 // This file is distributed in the hope that it will be useful,
@@ -31,27 +31,20 @@
 
 #include "vscp.h"
 
-/* This macro construct a signed integer from two unsigned chars in a safe way */
-#if !defined(construct_signed16)
+
+// This macro construct a signed integer from two unsigned chars in a safe way
 #define construct_signed16(msb, lsb) ((int16_t) ((((uint16_t) msb) << 8) + (uint16_t) lsb))
-#endif
 
-/* This macro construct a unsigned integer from two unsigned chars in a safe way */
-#if !defined(construct_unsigned16)
+// This macro construct a unsigned integer from two unsigned chars in a safe way
 #define construct_unsigned16(msb, lsb) ((uint16_t) ((((uint16_t) msb) << 8) + (uint16_t) lsb))
-#endif
 
-/* This macro construct a signed long from four unsigned chars in a safe way */
-#if !defined(construct_signed32)
+// This macro construct a signed long from four unsigned chars in a safe way
 #define construct_signed32(b0, b1, b2, b3)                                                                             \
   ((int32_t) ((((uint32_t) b0) << 24) + (((uint32_t) b1) << 16) + (((uint32_t) b2) << 8) + (uint32_t) b3))
-#endif
 
-/* This macro construct a unsigned long from four unsigned chars in a safe way */
-#if !defined(construct_unsigned32)
+// This macro construct a unsigned long from four unsigned chars in a safe way
 #define construct_unsigned32(b0, b1, b2, b3)                                                                           \
-  ((uint32_t) ((((uint32_t) b0) << 24) + (((uint32_t) b1) << 16) + (((uint32_t) b2) << 8) + (uint32_t) b3))
-#endif
+  ((uint32_t) ((((uint32_t) b0) << 24) + (((uint32_t) b1) << 16) + (((uint32_t) b1) << 8) + (uint32_t) b3))
 
 class CBootDevice_VSCP : public CBootDevice {
 public:
@@ -62,7 +55,7 @@ public:
       @param nodeid Nickname/nodeid for node that should be loaded
         with new code.
       @param statusCallback Status callback function or NULL
-      @param timeout Timeout for response
+      @param timeout Timeout for response  
   */
   CBootDevice_VSCP(CVscpClient *pclient,
                    uint8_t nodeid,
@@ -106,18 +99,16 @@ public:
   virtual ~CBootDevice_VSCP(void);
 
   // Memory Types
-  typedef enum mem_type {
-    MEM_TYPE_FLASH      = 0x00, // 0x00000000 - 0x3FFFFFFF 1G
-    MEM_TYPE_RAM        = 0x03, // 0x40000000 - 0xBFFFFFFF 2G
-    MEM_TYPE_USERID     = 0x04, // 0xC1000000 - 0xC1FFFFFF 16M
-    MEM_TYPE_CONFIG     = 0x02, // 0xC2000000 - 0xC2FFFFFF 16M
-    MEM_TYPE_EEPROM     = 0x01, // 0xC3000000 - 0xC3FFFFFF 16M
-    MEM_TYPE_BOOTLOADER = 0x06, // 0xC4000000 - 0xC4FFFFFF 16M
-    MEM_TYPE_FUSES      = 0x05, // 0xC5000000 - 0xC5FFFFFF 16M
-    MEM_TYPE_USER1      = 0xFD, // 0xD0000000 - 0xDFFFFFFF 256M
-    MEM_TYPE_USER2      = 0xFE, // 0xE0000000 - 0xEFFFFFFF 256M
-    MEM_TYPE_USER3      = 0xFF, // 0xF0000000 - 0xFFFFFFFF 256M
-  } mem_type_t;
+  enum mem_type {
+    MEM_TYPE_FLASH  = 0x00, // 0x00000000 - 0x3FFFFFFF 1G
+    MEM_TYPE_RAM    = 0x03, // 0x40000000 - 0xBFFFFFFF 2G
+    MEM_TYPE_USERID = 0x04, // 0xC1000000 - 0xC1FFFFFF 16M
+    MEM_TYPE_CONFIG = 0x02, // 0xC2000000 - 0xC2FFFFFF 16M
+    MEM_TYPE_EEPROM = 0x01, // 0xC3000000 - 0xC3FFFFFF 16M
+    MEM_TYPE_USER1  = 0x05, // 0xD0000000 - 0xDFFFFFFF 256M
+    MEM_TYPE_USER2  = 0x06, // 0xE0000000 - 0xEFFFFFFF 256M
+    MEM_TYPE_USER3  = 0x07, // 0xF0000000 - 0xFFFFFFFF 256M
+  };
 
   // Flash memory
   static const uint32_t MEM_CODE_START = 0x00000000;
@@ -139,14 +130,6 @@ public:
   static const uint32_t MEM_EEPROM_START = 0xC3000000;
   static const uint32_t MEM_EEPROM_END   = 0xC3FFFFFF;
 
-  // BOOTLOADER memory
-  static const uint32_t MEM_BOOTLOADER_START = 0xC4000000;
-  static const uint32_t MEM_BOOTLOADER_END   = 0xC4FFFFFF;
-
-  // FUSES memory
-  static const uint32_t MEM_FUSES_START = 0xC5000000;
-  static const uint32_t MEM_FUSES_END   = 0xC5FFFFFF;
-
   // User defined memory 0
   static const uint32_t MEM_USER0_START = 0xD0000000;
   static const uint32_t MEM_USER0_END   = 0xDFFFFFFF;
@@ -162,27 +145,18 @@ public:
   // Default timeout for response
   static const uint8_t BOOT_COMMAND_RESPONSE_TIMEOUT = 5;
 
-  // Number of memory types
-  static const uint8_t NUMBER_OF_MEMORY_TYPES = 10;
+  static const uint8_t NUMBER_OF_MEMORY_TYPES = 8;
 
-  /* clang-format off */
   struct memory_range {
     uint8_t type;
-    uint32_t start;
+    uint32_t beginning;
     uint32_t end;
-  } m_memory_range[NUMBER_OF_MEMORY_TYPES] = {
-    { 0x00, MEM_CODE_START, MEM_CODE_END },     
-    { 0x01, MEM_EEPROM_START, MEM_EEPROM_END },
-    { 0x02, MEM_CONFIG_START, MEM_CONFIG_END }, 
-    { 0x03, MEM_RAM_START, MEM_RAM_END },
-    { 0x04, MEM_USERID_START, MEM_USERID_END }, 
-    { 0x05, MEM_BOOTLOADER_START, MEM_BOOTLOADER_END },
-    { 0x06, MEM_FUSES_START, MEM_FUSES_END },   
-    { 0xfd, MEM_USER0_START, MEM_USER0_END },
-    { 0xfe, MEM_USER1_START, MEM_USER1_END },   
-    { 0xff, MEM_USER2_START, MEM_USER2_END }
+  } memory_range[NUMBER_OF_MEMORY_TYPES] = {
+    { 0x00, MEM_CODE_START, MEM_CODE_START },   { 0x01, MEM_EEPROM_START, MEM_EEPROM_END },
+    { 0x02, MEM_CONFIG_START, MEM_CONFIG_END }, { 0x03, MEM_RAM_START, MEM_RAM_END },
+    { 0x04, MEM_USERID_START, MEM_USERID_END }, { 0xfd, MEM_USER0_START, MEM_USER0_END },
+    { 0xfe, MEM_USER1_START, MEM_USER1_END },   { 0xff, MEM_USER2_START, MEM_USER2_END }
   };
-  /* clang-format on */
 
   // Initialize data
   void init(void);
@@ -226,6 +200,8 @@ public:
   */
   int deviceReboot(void);
 
+ 
+
   /*!
     Write block start to remote device
     @param block Block number to write
@@ -241,14 +217,14 @@ public:
   */
   int programBlock(uint32_t block);
 
-  /*!
-     Write a sector
-     @param paddr Pointer to first byte of 8-byte block to write
-       to remote device
-     @param size Number of data bytes to send. Must be less than the
-       max event data (8/512)
-     @return VSCP_ERROR_SUCCESS on success.
- */
+   /*!
+      Write a sector
+      @param paddr Pointer to first byte of 8-byte block to write
+        to remote device
+      @param size Number of data bytes to send. Must be less than the
+        max event data (8/512)
+      @return VSCP_ERROR_SUCCESS on success.
+  */
   int writeChunk(const uint8_t *paddr, uint16_t size);
 
   /*!
@@ -256,7 +232,7 @@ public:
     @param paddr Address to beginning of data to write
     @return VSCP_ERROR_SUCCESS on success.
   */
-  int writeBlock(uint32_t block, const uint8_t *paddr);
+  int writeBlock(const uint8_t *paddr);
 
   /*!
     Check response event

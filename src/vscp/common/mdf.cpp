@@ -4,7 +4,7 @@
 //
 // The MIT License (MIT)
 //
-// Copyright (C) 2000-2025 Ake Hedman, the VSCP project
+// Copyright (C) 2000-2024 Ake Hedman, the VSCP project
 // <info@vscp.org>
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -72,6 +72,8 @@ using namespace kainjow::mustache;
 
 // Bugger for XML parser
 #define XML_BUFF_SIZE 512000
+
+#define unused(x) ((void)x)
 
 // notes
 // =====
@@ -1827,8 +1829,10 @@ void
 CMDF::writeMap_json(std::ofstream &fout,
                     std::map<std::string, std::string> *pmap,
                     const std::string &tag,
-                    bool /*bCommaAtEnd*/)
+                    bool bCommaAtEnd)
 {
+  unused(bCommaAtEnd);
+  
   if ((nullptr != pmap) && pmap->size()) {
     fout << "," << std::endl;
     fout << "\"" << tag << "\": [" << std::endl;
@@ -1919,7 +1923,7 @@ CMDF::save_xml(const std::string &path)
     }
 
     if ((cnt = pManufacturer->getPhoneObjCount())) {
-      for (size_t i = 0; i < cnt; i++) {
+      for (unsigned i = 0; i < cnt; i++) {
         CMDF_Item *pitem = pManufacturer->getPhoneObj(i);
         if (nullptr != pitem) {
           fout << "<telephone>" << std::endl;
@@ -1932,7 +1936,7 @@ CMDF::save_xml(const std::string &path)
     }
 
     if ((cnt = pManufacturer->getFaxObjCount())) {
-      for (size_t i = 0; i < cnt; i++) {
+      for (unsigned i = 0; i < cnt; i++) {
         CMDF_Item *pitem = pManufacturer->getFaxObj(i);
         if (nullptr != pitem) {
           fout << "<fax>" << std::endl;
@@ -1945,7 +1949,7 @@ CMDF::save_xml(const std::string &path)
     }
 
     if ((cnt = pManufacturer->getEmailObjCount())) {
-      for (size_t i = 0; i < cnt; i++) {
+      for (unsigned i = 0; i < cnt; i++) {
         CMDF_Item *pitem = pManufacturer->getEmailObj(i);
         if (nullptr != pitem) {
           fout << "<email>" << std::endl;
@@ -1958,7 +1962,7 @@ CMDF::save_xml(const std::string &path)
     }
 
     if ((cnt = pManufacturer->getWebObjCount())) {
-      for (size_t i = 0; i < cnt; i++) {
+      for (unsigned i = 0; i < cnt; i++) {
         CMDF_Item *pitem = pManufacturer->getWebObj(i);
         if (nullptr != pitem) {
           fout << "<web>" << std::endl;
@@ -1971,7 +1975,7 @@ CMDF::save_xml(const std::string &path)
     }
 
     if ((cnt = pManufacturer->getSocialObjCount())) {
-      for (size_t i = 0; i < cnt; i++) {
+      for (unsigned i = 0; i < cnt; i++) {
         CMDF_Item *pitem = pManufacturer->getSocialObj(i);
         if (nullptr != pitem) {
           fout << "<social>" << std::endl;

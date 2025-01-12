@@ -37,6 +37,7 @@
 #endif
 #include <vscp-aes.h>
 #include <vscphelper.h>
+// #include "civetweb.h"
 
 #include "vscp-client-ws2.h"
 
@@ -45,7 +46,7 @@
 // for convenience
 using json = nlohmann::json;
 
-#define unused(x) ((void) x)
+#define unused(x) ((void)x)
 
 /*
 static int
@@ -139,7 +140,7 @@ ws2_client_data_handler(struct mg_connection *conn,
         }
         else {
             pObj->m_msgReceiveQueue.push_back(j);
-            sem_post(&pObj->m_semReceiveQueue);
+            sem_post(&pObj->m_sem_msg);
         }
     }
 
@@ -185,11 +186,7 @@ vscpClientWs2::vscpClientWs2()
   setConnectionTimeout();
   setResponseTimeout();
 
-#ifdef WIN32
-  m_semReceiveQueue = CreateSemaphore(NULL, 0, 0x7fffffff, NULL);
-#else
-  sem_init(&m_semReceiveQueue, 0, 0);
-#endif
+  sem_init(&m_sem_msg, 0, 0);
   // mg_init_library(MG_FEATURES_SSL);
 }
 
@@ -207,11 +204,7 @@ vscpClientWs2::~vscpClientWs2()
     vscp_deleteEvent_v2(&pev);
   }
 
-#ifdef WIN32
-  CloseHandle(m_semReceiveQueue);
-#else
-  sem_destroy(&m_semReceiveQueue);
-#endif
+  sem_destroy(&m_sem_msg);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -276,9 +269,7 @@ vscpClientWs2::connect(void)
 {
   json j;
   char ebuf[100]   = { 0 };
-  const char *path = "/ws2";
-
-  unused(path);
+  //const char *path = "/ws2";
 
   // m_conn = mg_connect_websocket_client( m_host.c_str(),
   //                                        m_port,
@@ -644,63 +635,6 @@ vscpClientWs2::receive(canalMsg &msg)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// receiveBlocking
-//
-
-int
-vscpClientWs2::receiveBlocking(vscpEvent &ev, long timeout)
-{
-  if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
-    if (errno == ETIMEDOUT) {
-      return VSCP_ERROR_TIMEOUT;
-    }
-    else {
-      return VSCP_ERROR_ERROR;
-    }
-  }
-
-  return receive(ev);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// receiveBlocking
-//
-
-int
-vscpClientWs2::receiveBlocking(vscpEventEx &ex, long timeout)
-{
-  if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
-    if (errno == ETIMEDOUT) {
-      return VSCP_ERROR_TIMEOUT;
-    }
-    else {
-      return VSCP_ERROR_ERROR;
-    }
-  }
-
-  return receive(ex);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// receiveBlocking
-//
-
-int
-vscpClientWs2::receiveBlocking(canalMsg &msg, long timeout)
-{
-  if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
-    if (errno == ETIMEDOUT) {
-      return VSCP_ERROR_TIMEOUT;
-    }
-    else {
-      return VSCP_ERROR_ERROR;
-    }
-  }
-
-  return receive(msg);
-}
-
-///////////////////////////////////////////////////////////////////////////////
 // setfilter
 //
 
@@ -948,7 +882,7 @@ vscpClientWs2::waitForResponse(uint32_t timeout)
   to.tv_nsec = 0;
   to.tv_sec  = ts + timeout / 1000;
 
-  if (-1 == sem_timedwait(&m_semReceiveQueue, &to)) {
+  if (-1 == sem_timedwait(&m_sem_msg, &to)) {
 
     switch (errno) {
 

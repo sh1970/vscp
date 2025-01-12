@@ -9,7 +9,7 @@
 //
 // This file is part of the VSCP (https://www.vscp.org)
 //
-// Copyright:   (C) 2007-2025
+// Copyright:   (C) 2007-2023
 // Ake Hedman, the VSCP project, <info@vscp.org>
 //
 // This file is distributed in the hope that it will be useful,
@@ -37,7 +37,7 @@
 #endif
 #include <vscp-aes.h>
 #include <vscphelper.h>
-
+// #include "civetweb.h"
 
 #include "vscp-client-ws1.h"
 
@@ -211,8 +211,9 @@ vscpClientWs1::getConfigAsJson(void)
 //
 
 bool
-vscpClientWs1::initFromJson(const std::string & /*config*/)
+vscpClientWs1::initFromJson(const std::string &config)
 {
+  unused(config); 
   return true;
 }
 
@@ -585,66 +586,6 @@ vscpClientWs1::receive(canalMsg &msg)
 } 
 
 ///////////////////////////////////////////////////////////////////////////////
-// receiveBlocking
-//
-
-int
-vscpClientWs1::receiveBlocking(vscpEvent &ev, long timeout)
-{
-  unused(timeout);
-  // if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
-  //   if (errno == ETIMEDOUT) {
-  //     return VSCP_ERROR_TIMEOUT;
-  //   }
-  //   else {
-  //     return VSCP_ERROR_ERROR;
-  //   }
-  // }
-
-  return receive(ev);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// receiveBlocking
-//
-
-int
-vscpClientWs1::receiveBlocking(vscpEventEx &ex, long timeout)
-{
-  unused(timeout);
-  // if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
-  //   if (errno == ETIMEDOUT) {
-  //     return VSCP_ERROR_TIMEOUT;
-  //   }
-  //   else {
-  //     return VSCP_ERROR_ERROR;
-  //   }
-  // }
-
-  return receive(ex);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// receiveBlocking
-//
-
-int
-vscpClientWs1::receiveBlocking(canalMsg &msg, long timeout)
-{
-  unused(timeout);
-  // if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
-  //   if (errno == ETIMEDOUT) {
-  //     return VSCP_ERROR_TIMEOUT;
-  //   }
-  //   else {
-  //     return VSCP_ERROR_ERROR;
-  //   }
-  // }
-
-  return receive(msg);
-}
-
-///////////////////////////////////////////////////////////////////////////////
 // setfilter
 //
 
@@ -810,7 +751,7 @@ vscpClientWs1::getinterfaces(std::deque<std::string> &iflist)
     return VSCP_ERROR_OPERATION_FAILED;
   }
 
-  for (size_t i = 3; i < args.size(); i++) {
+  for (unsigned  i = 3; i < args.size(); i++) {
     std::string str = args.front();
     args.pop_front();
     iflist.push_back(str);
