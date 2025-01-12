@@ -61,6 +61,8 @@
 using json = nlohmann::json;
 using namespace kainjow::mustache;
 
+#define unused(x) ((void) x)
+
 // Forward declaration
 
 // ----------------------------------------------------------------------------
@@ -134,7 +136,7 @@ mqtt_on_log(struct mosquitto *mosq, void *pData, int level, const char *logmsg)
 static void
 mqtt_on_connect(struct mosquitto *mosq, void *pData, int rv)
 {
-
+  
   // Check for valid handle
   if (nullptr == mosq) {
     return;

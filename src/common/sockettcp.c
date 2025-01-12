@@ -138,6 +138,8 @@
 
 #include "vscpmd5.h"
 
+#define unused(x) ((void)x)
+
 // #define UNUSED(expr) (do { (void)(expr); } while (0))
 #define SUPPRESS_WARNING(a) (void) a
 
@@ -2454,6 +2456,8 @@ stcp_connect_remote_impl(const char *host,
   union usa sa;
   struct sockaddr *psa;
   socklen_t len;
+
+  unused(timeout);
 
   // Need secure options if SSL
   if (bUseSSL && (NULL == secure_options)) {

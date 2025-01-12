@@ -37,9 +37,11 @@
 #endif
 #include <vscp-aes.h>
 #include <vscphelper.h>
-// #include "civetweb.h"
+
 
 #include "vscp-client-ws1.h"
+
+#define unused(x) ((void)x)
 
 /*
 static int
@@ -589,6 +591,7 @@ vscpClientWs1::receive(canalMsg &msg)
 int
 vscpClientWs1::receiveBlocking(vscpEvent &ev, long timeout)
 {
+  unused(timeout);
   // if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
   //   if (errno == ETIMEDOUT) {
   //     return VSCP_ERROR_TIMEOUT;
@@ -608,6 +611,7 @@ vscpClientWs1::receiveBlocking(vscpEvent &ev, long timeout)
 int
 vscpClientWs1::receiveBlocking(vscpEventEx &ex, long timeout)
 {
+  unused(timeout);
   // if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
   //   if (errno == ETIMEDOUT) {
   //     return VSCP_ERROR_TIMEOUT;
@@ -627,6 +631,7 @@ vscpClientWs1::receiveBlocking(vscpEventEx &ex, long timeout)
 int
 vscpClientWs1::receiveBlocking(canalMsg &msg, long timeout)
 {
+  unused(timeout);
   // if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
   //   if (errno == ETIMEDOUT) {
   //     return VSCP_ERROR_TIMEOUT;

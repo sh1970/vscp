@@ -30,6 +30,8 @@
 #include "vscphelper.h"
 #include "vscp-client-multicast.h"
 
+#define unused(x) ((void)x)
+
 ///////////////////////////////////////////////////////////////////////////////
 // CTor
 //
@@ -178,6 +180,7 @@ vscpClientMulticast::receive(canalMsg &msg)
 int
 vscpClientMulticast::receiveBlocking(vscpEvent &ev, long timeout)
 {
+  unused(timeout);
   // if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
   //   if (errno == ETIMEDOUT) {
   //     return VSCP_ERROR_TIMEOUT;
@@ -197,6 +200,7 @@ vscpClientMulticast::receiveBlocking(vscpEvent &ev, long timeout)
 int
 vscpClientMulticast::receiveBlocking(vscpEventEx &ex, long timeout)
 {
+  unused(timeout);
   // if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
   //   if (errno == ETIMEDOUT) {
   //     return VSCP_ERROR_TIMEOUT;
@@ -216,6 +220,7 @@ vscpClientMulticast::receiveBlocking(vscpEventEx &ex, long timeout)
 int
 vscpClientMulticast::receiveBlocking(canalMsg &msg, long timeout)
 {
+  unused(timeout);
   // if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
   //   if (errno == ETIMEDOUT) {
   //     return VSCP_ERROR_TIMEOUT;

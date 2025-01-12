@@ -29,6 +29,8 @@
 
 #include "vscp-client-tcp.h"
 
+#define unused(x) ((void) x)
+
 void
 workerThread(vscpClientTcp *pObj);
 

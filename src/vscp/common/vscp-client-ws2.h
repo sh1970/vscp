@@ -241,7 +241,11 @@ public:
   struct mg_connection *m_conn;
 
   // Semaphore for message receive queue
-  sem_t m_sem_msg;
+  #ifdef WIN32
+ HANDLE m_semReceiveQueue;
+ #else  
+  sem_t m_semReceiveQueue;
+ #endif
 
   // JSON message receive queue
   std::deque<nlohmann::json> m_msgReceiveQueue;

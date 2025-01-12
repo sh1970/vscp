@@ -48,6 +48,8 @@ using json = nlohmann::json;
 // #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/spdlog.h>
 
+#define unused(x) ((void) x)
+
 // Forward declaration
 static void *
 workerThread(void *pObj);
@@ -409,6 +411,7 @@ vscpClientCanal::receive(canalMsg &msg)
 int
 vscpClientCanal::receiveBlocking(vscpEvent &ev, long timeout)
 {
+  unused(timeout);
   // if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
   //   if (errno == ETIMEDOUT) {
   //     return VSCP_ERROR_TIMEOUT;
@@ -428,6 +431,7 @@ vscpClientCanal::receiveBlocking(vscpEvent &ev, long timeout)
 int
 vscpClientCanal::receiveBlocking(vscpEventEx &ex, long timeout)
 {
+  unused(timeout);
   // if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
   //   if (errno == ETIMEDOUT) {
   //     return VSCP_ERROR_TIMEOUT;
@@ -447,6 +451,7 @@ vscpClientCanal::receiveBlocking(vscpEventEx &ex, long timeout)
 int
 vscpClientCanal::receiveBlocking(canalMsg &msg, long timeout)
 {
+  unused(timeout);
   // if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
   //   if (errno == ETIMEDOUT) {
   //     return VSCP_ERROR_TIMEOUT;

@@ -30,6 +30,8 @@
 #include "vscphelper.h"
 #include "vscp-client-udp.h"
 
+#define unused(x) ((void)x)
+
 ///////////////////////////////////////////////////////////////////////////////
 // CTor
 //
@@ -177,6 +179,7 @@ vscpClientUdp::receive(canalMsg &msg)
 int
 vscpClientUdp::receiveBlocking(vscpEvent &ev, long timeout)
 {
+  unused(timeout);
   // if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
   //   if (errno == ETIMEDOUT) {
   //     return VSCP_ERROR_TIMEOUT;
@@ -196,6 +199,7 @@ vscpClientUdp::receiveBlocking(vscpEvent &ev, long timeout)
 int
 vscpClientUdp::receiveBlocking(vscpEventEx &ex, long timeout)
 {
+  unused(timeout);
   // if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
   //   if (errno == ETIMEDOUT) {
   //     return VSCP_ERROR_TIMEOUT;
@@ -215,6 +219,7 @@ vscpClientUdp::receiveBlocking(vscpEventEx &ex, long timeout)
 int
 vscpClientUdp::receiveBlocking(canalMsg &msg, long timeout)
 {
+  unused(timeout);  
   // if (-1 == vscp_sem_wait(&m_semReceiveQueue, timeout)) {
   //   if (errno == ETIMEDOUT) {
   //     return VSCP_ERROR_TIMEOUT;
