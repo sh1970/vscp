@@ -61,34 +61,6 @@ extern "C" {
 /* This structure is for VSCP Level II   */
 
 typedef struct _vscpEvent {
-  uint16_t crc; /* crc checksum (calculated from here to end) */
-                /* Used for UDP/Ethernet etc */
-
-  uint32_t obid; /* Used by driver for channel info etc. */
-
-  /* 
-    Time block - Always UTC time. I all zero set current time on receiving end 
-
-    If year is set to 0xffff a unix UTC timestamp with nanosecond precision is formed by the 
-    eight byte buffer starting at the day field MSB first.
-  */
-  uint16_t year;
-  uint8_t month;  /* 1-12 */
-  
-  union {
-    uint64_t timestamp_ns; /* Unix timestamp with nanosecond precision (when year == 0xffff) */
-    struct {
-      uint8_t day;    /* 1-31 */
-      uint8_t hour;   /* 0-23 */
-      uint8_t minute; /* 0-59 */
-      uint8_t second; /* 0-59 */
-      uint32_t timestamp; /* Relative time stamp for package in microseconds */
-                          /* ~71 minutes before roll over */
-                          /* If all zero set relative time on receiving end */
-    };
-  };
-
-  /* ----- CRC should be calculated from here to end + data block ----  */
 
   /*
       Bit 15 - This is a dumb node. No MDF, register, nothing.
@@ -108,12 +80,40 @@ typedef struct _vscpEvent {
   */
   uint16_t head;
 
+  /* ----- CRC should be calculated from here to end + data block ----  */
+
+  uint32_t obid; /* Used by driver for channel info etc. */
+
+  /*
+    Time block - Always UTC time. I all zero set current time on receiving end
+
+    If year is set to 0xffff a unix UTC timestamp with nanosecond precision is formed by the
+    eight byte buffer starting at the day field MSB first.
+  */
+  uint16_t year;
+  uint8_t month; /* 1-12 */
+
+  union {
+    uint64_t timestamp_ns; /* Unix timestamp with nanosecond precision (when year == 0xffff) */
+    struct {
+      uint8_t day;        /* 1-31 */
+      uint8_t hour;       /* 0-23 */
+      uint8_t minute;     /* 0-59 */
+      uint8_t second;     /* 0-59 */
+      uint32_t timestamp; /* Relative time stamp for package in microseconds */
+                          /* ~71 minutes before roll over */
+                          /* If all zero set relative time on receiving end */
+    };
+  };
+
   uint16_t vscp_class; /* VSCP class */
   uint16_t vscp_type;  /* VSCP type */
   uint8_t GUID[16];    /* Node globally unique id MSB(0) -> LSB(15) */
   uint16_t sizeData;   /* Number of valid data bytes */
 
   uint8_t *pdata; /* Pointer to data. Max 512 bytes */
+
+  uint16_t crc; /* Used for UDP/Ethernet etc */
 
 } vscpEvent;
 
@@ -126,38 +126,6 @@ typedef vscpEvent *PVSCPEVENT;
 
 typedef struct _vscpEventEx {
 
-  uint16_t crc; /* CRC checksum (calculated from here to end) */
-                /* Used for UDP/Ethernet etc */
-
-  uint32_t obid; /* Used by driver for channel info etc. */
-
-  /* 
-    Time block - Always UTC time. I all zero set current time on receiving end 
-
-    If year is set to 0xffff a unix UTC timestamp with nanosecond precision is formed by the eight 
-    byte buffer starting at the day field MSB first.
-  */
-  uint16_t year;
-  uint8_t month;  /* 1-12 */
-  
-  union {
-    uint64_t timestamp_ns; /* Unix timestamp with nanosecond precision (when year == 0xffff) */
-    struct {
-      uint8_t day;    /* 1-31 */
-      uint8_t hour;   /* 0-23 */
-      uint8_t minute; /* 0-59 */
-      uint8_t second; /* 0-59 */
-      uint32_t timestamp; /* Relative time stamp for package in microseconds */
-                          /* ~71 minutes before roll over */
-                          /* If all zero set relative time on receiving end */
-    };
-  };
-
-  uint32_t timestamp; /* Relative time stamp for package in microseconds. */
-                      /* ~71 minutes before roll over */
-
-  /* CRC should be calculated from here to end + data block */
-  uint16_t head; /* Bit 15   GUID is IP v.6 address. */
   /*
       Bit 15 - This is a dumb node. No MDF, register, nothing.
       Bit 14 - GUID type
@@ -174,6 +142,36 @@ typedef struct _vscpEventEx {
       Bit 1 = Rolling index.
       Bit 0 = Rolling index.
   */
+  uint16_t head;
+
+  /* CRC should be calculated from here to end + data block */
+
+  uint32_t obid; /* Used by driver for channel info etc. */
+
+  /*
+    Time block - Always UTC time. I all zero set current time on receiving end
+
+    If year is set to 0xffff a unix UTC timestamp with nanosecond precision is formed by the eight
+    byte buffer starting at the day field MSB first.
+  */
+  uint16_t year;
+  uint8_t month; /* 1-12 */
+
+  union {
+    uint64_t timestamp_ns; /* Unix timestamp with nanosecond precision (when year == 0xffff) */
+    struct {
+      uint8_t day;        /* 1-31 */
+      uint8_t hour;       /* 0-23 */
+      uint8_t minute;     /* 0-59 */
+      uint8_t second;     /* 0-59 */
+      uint32_t timestamp; /* Relative time stamp for package in microseconds */
+                          /* ~71 minutes before roll over */
+                          /* If all zero set relative time on receiving end */
+    };
+
+    uint16_t crc; /* Used for UDP/Ethernet etc */
+  };
+
   uint16_t vscp_class; /* VSCP class   */
   uint16_t vscp_type;  /* VSCP type    */
   uint8_t GUID[16];    /* Node globally unique id MSB(0) -> LSB(15)    */
@@ -851,7 +849,9 @@ enum enumMqttMsgFormat { jsonfmt, xmlfmt, strfmt, binfmt, autofmt };
   printf("GUID is: " GUIDSTR "\n", GUID2STR(pEvent->GUID));
 */
 #ifndef GUID2STR
-#define GUID2STR(a) (a)[0], (a)[1], (a)[2], (a)[3], (a)[4], (a)[5], (a)[6], (a)[7], (a)[8], (a)[9], (a)[10], (a)[11], (a)[12], (a)[13], (a)[14], (a)[15]
+#define GUID2STR(a)                                                                                                    \
+  (a)[0], (a)[1], (a)[2], (a)[3], (a)[4], (a)[5], (a)[6], (a)[7], (a)[8], (a)[9], (a)[10], (a)[11], (a)[12], (a)[13],  \
+    (a)[14], (a)[15]
 #define GUIDSTR "%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x"
 #endif
 
