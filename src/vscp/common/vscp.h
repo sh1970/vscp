@@ -5,7 +5,7 @@
 
  The MIT License (MIT)
 
- Copyright (C) 2000-2025 Ake Hedman, the VSCP project <info@vscp.org>
+ Copyright (C) 2000-2026 Ake Hedman, the VSCP project <info@vscp.org>
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -66,17 +66,27 @@ typedef struct _vscpEvent {
 
   uint32_t obid; /* Used by driver for channel info etc. */
 
-  /* Time block - Always UTC time. I all zero set current time on receiving end */
+  /* 
+    Time block - Always UTC time. I all zero set current time on receiving end 
+
+    If year is set to 0xffff a unix UTC timestamp with nanosecond precision is formed by the 
+    eight byte buffer starting at the day field MSB first.
+  */
   uint16_t year;
   uint8_t month;  /* 1-12 */
-  uint8_t day;    /* 1-31 */
-  uint8_t hour;   /* 0-23 */
-  uint8_t minute; /* 0-59 */
-  uint8_t second; /* 0-59 */
-
-  uint32_t timestamp; /* Relative time stamp for package in microseconds */
-                      /* ~71 minutes before roll over */
-                      /* If all zero set relative time on receiving end */
+  
+  union {
+    uint64_t timestamp_ns; /* Unix timestamp with nanosecond precision (when year == 0xffff) */
+    struct {
+      uint8_t day;    /* 1-31 */
+      uint8_t hour;   /* 0-23 */
+      uint8_t minute; /* 0-59 */
+      uint8_t second; /* 0-59 */
+      uint32_t timestamp; /* Relative time stamp for package in microseconds */
+                          /* ~71 minutes before roll over */
+                          /* If all zero set relative time on receiving end */
+    };
+  };
 
   /* ----- CRC should be calculated from here to end + data block ----  */
 
@@ -84,7 +94,7 @@ typedef struct _vscpEvent {
       Bit 15 - This is a dumb node. No MDF, register, nothing.
       Bit 14 - GUID type
       Bit 13 - GUID type
-      Bit 12 - GUID type (GUID is IP v.6 address.)
+      Bit 12 - GUID type (GUID is IP v.6 address if set and 13/14 is zero.)
       Bit 8-11 = Reserved
       Bit 765 =  priority, Priority 0-7 where 0 is highest.
       Bit 4 = hard coded, true for a hard coded device.
@@ -121,13 +131,27 @@ typedef struct _vscpEventEx {
 
   uint32_t obid; /* Used by driver for channel info etc. */
 
-  /* Time block - Always UTC time */
+  /* 
+    Time block - Always UTC time. I all zero set current time on receiving end 
+
+    If year is set to 0xffff a unix UTC timestamp with nanosecond precision is formed by the eight 
+    byte buffer starting at the day field MSB first.
+  */
   uint16_t year;
   uint8_t month;  /* 1-12 */
-  uint8_t day;    /* 1-31 */
-  uint8_t hour;   /* 0-23 */
-  uint8_t minute; /* 0-59 */
-  uint8_t second; /* 0-59 */
+  
+  union {
+    uint64_t timestamp_ns; /* Unix timestamp with nanosecond precision (when year == 0xffff) */
+    struct {
+      uint8_t day;    /* 1-31 */
+      uint8_t hour;   /* 0-23 */
+      uint8_t minute; /* 0-59 */
+      uint8_t second; /* 0-59 */
+      uint32_t timestamp; /* Relative time stamp for package in microseconds */
+                          /* ~71 minutes before roll over */
+                          /* If all zero set relative time on receiving end */
+    };
+  };
 
   uint32_t timestamp; /* Relative time stamp for package in microseconds. */
                       /* ~71 minutes before roll over */
@@ -138,7 +162,7 @@ typedef struct _vscpEventEx {
       Bit 15 - This is a dumb node. No MDF, register, nothing.
       Bit 14 - GUID type
       Bit 13 - GUID type
-      Bit 12 - GUID type (GUID is IP v.6 address.)
+      Bit 12 - GUID type (GUID is IP v.6 address if set and 13/14 is zero.)
       Bit 8-11 = Reserved
       Bit 765 =  priority, Priority 0-7 where 0 is highest.
       Bit 4 = hard coded, true for a hard coded device.
