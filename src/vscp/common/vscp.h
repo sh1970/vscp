@@ -68,7 +68,7 @@ typedef struct _vscpEvent {
       Bit 13 - GUID type
       Bit 12 - GUID type (GUID is IP v.6 address if set and 13/14 is zero.)
       Bit 8-11 = Reserved
-      Bit 765 =  priority, Priority 0-7 where 0 is highest.
+      Bit 765 =  priority, Priority 0-7 where 0 is highest priority.
       Bit 4 = hard coded, true for a hard coded device.
       Bit 3 = Don't calculate CRC, false for CRC usage.
             Just checked when CRC is used.
@@ -132,7 +132,7 @@ typedef struct _vscpEventEx {
       Bit 13 - GUID type
       Bit 12 - GUID type (GUID is IP v.6 address if set and 13/14 is zero.)
       Bit 8-11 = Reserved
-      Bit 765 =  priority, Priority 0-7 where 0 is highest.
+      Bit 765 =  priority, Priority 0-7 where 0 is highest priority.
       Bit 4 = hard coded, true for a hard coded device.
       Bit 3 = Don't calculate CRC, false for CRC usage.
             Just checked when CRC is used.
