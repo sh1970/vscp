@@ -1,4 +1,4 @@
-/*
+s/*
  FILE: vscp.h
 
  This file is part of the VSCP (https://www.vscp.org)

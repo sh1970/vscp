@@ -2567,7 +2567,7 @@ vscpClientMqtt::send(vscpEvent &ev)
                   ppublish->getQos(),
                   ppublish->getRetain());
 
-    spdlog::trace("MQTT send; len=%d QOS=%d retain=%s\n",
+    spdlog::trace("MQTT send; len={0} QOS={1} retain={2}\n",
                   (int) lenPayload,
                   ppublish->getQos(),
                   (ppublish->getRetain() ? "true" : "false"));
