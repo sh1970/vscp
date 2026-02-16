@@ -36,7 +36,6 @@
 #if !defined(VSCPHELPER_H__INCLUDED_)
 #define VSCPHELPER_H__INCLUDED_
 
-
 #ifndef WIN32
 #include <byteswap.h>
 #include <netinet/in.h>
@@ -64,7 +63,7 @@
 
 // For windows
 #ifndef CAN_MTU
-#define CAN_MTU 8         // TODO
+#define CAN_MTU 8 // TODO
 #endif
 
 /*  byte swapping */
@@ -249,9 +248,9 @@ vscp_mem_usage(double &vm_usage, double &resident_set);
 /*!
     Wait for semaphore
 
-    @param hHandle Pointer to handle to semaphore. The pointer 
+    @param hHandle Pointer to handle to semaphore. The pointer
       is needed to be compatible with Linux semaphore handles.
-    @param waitms Time in milliseconds to wait. 
+    @param waitms Time in milliseconds to wait.
       if waitms is 0 - return immidiatly
       if waitms is INFINITE - wait forever
       else wait for waitms milliseconds
@@ -274,19 +273,20 @@ int
 vscp_sem_wait(sem_t *sem, uint32_t waitms);
 #endif
 
-
 #ifdef WIN32
 /*!
   @param phHandle Pointer to handle of semaphore to wait for
   @return 0 on success, -1 on error
 */
-int vscp_sem_post(HANDLE *phHandle);
+int
+vscp_sem_post(HANDLE *phHandle);
 #else
 /*!
   @param sem Pointer to semaphore to wait for
   @return 0 on success, -1 on error
 */
-int vscp_sem_post(sem_t *sem);
+int
+vscp_sem_post(sem_t *sem);
 #endif
 
 /*!
@@ -621,7 +621,7 @@ vscp_isNumber(const std::string &strNumber)
   std::string str = strNumber;
   vscp_trim(str);
   vscp_makeLower(str);
-  if (isdigit(str[0]) || vscp_startsWith(str, "0x")|| vscp_startsWith(str, "0o")|| vscp_startsWith(str, "0b")) {
+  if (isdigit(str[0]) || vscp_startsWith(str, "0x") || vscp_startsWith(str, "0o") || vscp_startsWith(str, "0b")) {
     return true;
   }
 
@@ -724,16 +724,52 @@ bool
 vscp_parseISOCombined(struct tm *ptm, std::string &dt);
 
 /*!
- *  Escape XML string
- *
- *  @param dst Resulting string. Buffer size must be large enough to
- *          hold expanded result.
- *  @param fst_len Size of dst buffer.
- *  @param src Pointer to string that should be converted.
- *  @return True on success, false on failure.
- */
-bool
-vscp_XML_Escape(char *dst, size_t dst_len, const char *src);
+    Convert date and time to unix 64-bit time in nanoseconds
+
+    @param year Year
+    @param month Month
+    @param day Day
+    @param hour Hour
+    @param minute Minute
+    @param second Second
+    @param microsecond Microsecond
+    @return Unix time in nanoseconds or -1 on error.
+*/
+int64_t
+vscp_to_unix_ns(int year, int month, int day, int hour, int minute, int second, uint32_t microsecond);
+
+/*!
+    Convert unix time in nanoseconds to date and time
+    @param unix_ns Unix time in nanoseconds
+    @param year Year
+    @param month Month
+    @param day Day
+    @param hour Hour
+    @param minute Minute
+    @param second Second
+    @param microsecond Microsecond
+*/
+
+void
+vscp_from_unix_ns(int64_t unix_ns,
+                  int *year,
+                  int *month,
+                  int *day,
+                  int *hour,
+                  int *minute,
+                  int *second,
+                  uint32_t *microsecond);
+
+  /*!
+   *  Escape XML string
+   *
+   *  @param dst Resulting string. Buffer size must be large enough to
+   *          hold expanded result.
+   *  @param fst_len Size of dst buffer.
+   *  @param src Pointer to string that should be converted.
+   *  @return True on success, false on failure.
+   */
+  bool vscp_XML_Escape(char *dst, size_t dst_len, const char *src);
 
 /*!
     Get ip from domain name
@@ -1622,7 +1658,7 @@ vscp_convertEventExToJSON(std::string &strJSON, const vscpEventEx *pEventEx);
  * it will be set to zero. This means a value
  * can be omitted in the JSON string. The only
  * values that must be in the JSON string is
- * class and type as long as the GUID is known 
+ * class and type as long as the GUID is known
  * beforehand
  */
 bool
@@ -1630,12 +1666,12 @@ vscp_convertJSONToEvent(vscpEvent *pEvent, std::string &strJSON);
 
 /*!
  * Convert JSON string to eventex
- * 
+ *
  * If a value is not found in the JSON string
  * it will be set to zero. This means a value
  * can be omitted in the JSON string. The only
  * values that must be in the JSON string is
- * class and type as long as the GUID is known 
+ * class and type as long as the GUID is known
  * beforehand
  */
 bool
@@ -1909,8 +1945,8 @@ vscp_convertEventToCanal(canalMsg *pcanalMsg, const vscpEvent *pvscpEvent, uint8
 
 /*!
     Covert VSCP event to CANAL message
-    
-    Convert VSCP event to a CANAL message    
+
+    Convert VSCP event to a CANAL message
     @param pcanalMsg Pointer to CANAL message that get result
     @param pvscpEventEx Pointer to VSCP event ex that should be converted
     @param mode Size of CAN frame structure. Used to detect fd-mode

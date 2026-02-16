@@ -901,6 +901,62 @@ vscp_parseISOCombined(struct tm *ptm, std::string &dt)
   return true;
 }
 
+#include <chrono>
+
+///////////////////////////////////////////////////////////////////////////////
+// vscp_to_unix_ns
+//
+
+int64_t vscp_to_unix_ns(
+    int year, int month, int day,
+    int hour, int minute, int second,
+    uint32_t microsecond)
+{
+    struct tm t;
+    t.tm_year = year - 1900;
+    t.tm_mon  = month - 1;
+    t.tm_mday = day;
+    t.tm_hour = hour;
+    t.tm_min  = minute;
+    t.tm_sec  = second;
+    t.tm_isdst = 0;
+
+    time_t unix_seconds = timegm(&t);  // Use UTC (POSIX)
+    return ((int64_t)unix_seconds * 1000000000LL)
+           + ((int64_t)microsecond * 1000LL);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// vscp_from_unix_ns
+//
+
+void vscp_from_unix_ns(
+    int64_t unix_ns,
+    int *year, int *month, int *day,
+    int *hour, int *minute, int *second,
+    uint32_t *microsecond)
+{
+    int64_t sec  = unix_ns / 1000000000LL;
+    int64_t nsec = unix_ns % 1000000000LL;
+
+    if (nsec < 0) {   // handle negative timestamps
+        sec--;
+        nsec += 1000000000LL;
+    }
+
+    time_t t = (time_t)sec;
+    struct tm tm;
+    gmtime_r(&t, &tm);   // UTC
+
+    *year  = tm.tm_year + 1900;
+    *month = tm.tm_mon + 1;
+    *day   = tm.tm_mday;
+    *hour  = tm.tm_hour;
+    *minute= tm.tm_min;
+    *second= tm.tm_sec;
+    *microsecond = (uint32_t)(nsec / 1000);
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // vscp_safe_encode_str
 //

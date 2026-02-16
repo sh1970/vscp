@@ -757,7 +757,7 @@ VscpRemoteTcpIf::doCmdReceiveEx(vscpEventEx *pEventEx)
 
   if (!vscp_convertEventToEventEx(pEventEx, pEvent)) {
     vscp_deleteEvent(pEvent);
-    return VSCP_ERROR_CONVERSION;
+    return VSCP_ERROR_INVALID_FORMAT;
   }
 
   vscp_deleteEvent(pEvent);

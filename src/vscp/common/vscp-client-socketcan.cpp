@@ -332,10 +332,10 @@ vscpClientSocketCan::connect(void)
     return VSCP_ERROR_SUCCESS;
   }
 
-  // start the workerthread
-  m_bRun = true; // Workerthread should run, run, run...
+  // start the worker thread
+  m_bRun = true; // Worker thread should run, run, run...
   if (pthread_create(&m_threadWork, NULL, workerThread, this)) {
-    spdlog::critical("SOCKETCAN client: Failed to start workerthread");
+    spdlog::critical("SOCKETCAN client: Failed to start worker thread");
     return false;
   }
 
