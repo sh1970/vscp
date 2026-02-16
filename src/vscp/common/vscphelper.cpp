@@ -901,34 +901,84 @@ vscp_parseISOCombined(struct tm *ptm, std::string &dt)
   return true;
 }
 
-#include <chrono>
 
 ///////////////////////////////////////////////////////////////////////////////
 // vscp_to_unix_ns
 //
+
+#define NS_PER_SEC     1000000000LL
+#define SECS_PER_DAY   86400LL
+
+// Convert civil date to days since 1970-01-01 (Unix epoch)
+static int64_t days_from_civil(int year, int month, int day)
+{
+    year -= (month <= 2);
+    int era = (year >= 0 ? year : year - 399) / 400;
+    unsigned yoe = (unsigned)(year - era * 400);  // [0, 399]
+    unsigned doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5
+                   + day - 1;                    // [0, 365]
+    unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy; // [0,146096]
+    return era * 146097LL + (int64_t)doe - 719468LL;
+}
+
+int64_t to_unix_ns_embedded(
+    int year, int month, int day,
+    int hour, int minute, int second,
+    uint32_t microsecond)
+{
+    int64_t days = days_from_civil(year, month, day);
+    int64_t sec =
+        days * SECS_PER_DAY +
+        hour * 3600LL +
+        minute * 60LL +
+        second;
+
+    return sec * NS_PER_SEC + (int64_t)microsecond * 1000LL;
+}
 
 int64_t vscp_to_unix_ns(
     int year, int month, int day,
     int hour, int minute, int second,
     uint32_t microsecond)
 {
-    struct tm t;
-    t.tm_year = year - 1900;
-    t.tm_mon  = month - 1;
-    t.tm_mday = day;
-    t.tm_hour = hour;
-    t.tm_min  = minute;
-    t.tm_sec  = second;
-    t.tm_isdst = 0;
+    // Convert date to days since epoch
+    int64_t days = days_from_civil(year, month, day);
 
-    time_t unix_seconds = timegm(&t);  // Use UTC (POSIX)
-    return ((int64_t)unix_seconds * 1000000000LL)
-           + ((int64_t)microsecond * 1000LL);
+    // Convert everything to seconds
+    int64_t total_seconds =
+        days * SECS_PER_DAY +
+        hour   * 3600LL +
+        minute * 60LL +
+        second;
+
+    // Convert to nanoseconds
+    return total_seconds * NS_PER_SEC
+           + (int64_t)microsecond * 1000LL;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // vscp_from_unix_ns
 //
+
+static void civil_from_days(int64_t z,
+                            int *y, int *m, int *d)
+{
+    // z = days since 1970-01-01
+    z += 719468;  // shift to civil 0000-03-01 base
+
+    int64_t era = (z >= 0 ? z : z - 146096) / 146097;
+    unsigned doe = (unsigned)(z - era * 146097);          // [0, 146096]
+    unsigned yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365;
+    int64_t y_full = (int64_t)yoe + era * 400;
+    unsigned doy = doe - (365*yoe + yoe/4 - yoe/100);
+    unsigned mp = (5*doy + 2)/153;
+    unsigned d_full = doy - (153*mp+2)/5 + 1;
+    unsigned m_full = mp + (mp < 10 ? 3 : -9);
+
+    *y = (int)(y_full + (m_full <= 2));
+    *m = (int)m_full;
+    *d = (int)d_full;
+}
 
 void vscp_from_unix_ns(
     int64_t unix_ns,
@@ -936,24 +986,33 @@ void vscp_from_unix_ns(
     int *hour, int *minute, int *second,
     uint32_t *microsecond)
 {
-    int64_t sec  = unix_ns / 1000000000LL;
-    int64_t nsec = unix_ns % 1000000000LL;
+    // --- Split seconds and nanoseconds safely ---
+    int64_t sec  = unix_ns / NS_PER_SEC;
+    int64_t nsec = unix_ns % NS_PER_SEC;
 
-    if (nsec < 0) {   // handle negative timestamps
+    if (nsec < 0) {
         sec--;
-        nsec += 1000000000LL;
+        nsec += NS_PER_SEC;
     }
 
-    time_t t = (time_t)sec;
-    struct tm tm;
-    gmtime_r(&t, &tm);   // UTC
+    // --- Split days and time-of-day ---
+    int64_t days = sec / SECS_PER_DAY;
+    int64_t rem  = sec % SECS_PER_DAY;
 
-    *year  = tm.tm_year + 1900;
-    *month = tm.tm_mon + 1;
-    *day   = tm.tm_mday;
-    *hour  = tm.tm_hour;
-    *minute= tm.tm_min;
-    *second= tm.tm_sec;
+    if (rem < 0) {
+        rem += SECS_PER_DAY;
+        days--;
+    }
+
+    // --- Convert days → Y/M/D ---
+    civil_from_days(days, year, month, day);
+
+    // --- Convert remainder → H:M:S ---
+    *hour   = (int)(rem / 3600);
+    rem    %= 3600;
+    *minute = (int)(rem / 60);
+    *second = (int)(rem % 60);
+
     *microsecond = (uint32_t)(nsec / 1000);
 }
 
