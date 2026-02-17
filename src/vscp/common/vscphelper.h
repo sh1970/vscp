@@ -1275,7 +1275,7 @@ vscp_getMeasurementAsFloat(const unsigned char *pNorm, const unsigned char lengt
  * @return true on success, false otherwise.
  */
 bool
-vscp_convertLevel1MeasuremenToLevel2Double(vscpEvent *pEventLevel1);
+vscp_convertLevel1MeasurementToLevel2Double(vscpEvent *pEventLevel1);
 
 /*!
  * Convert a Level I measurement event to a Level II double measurement
@@ -1285,7 +1285,7 @@ vscp_convertLevel1MeasuremenToLevel2Double(vscpEvent *pEventLevel1);
  * @return true on success, false otherwise.
  */
 bool
-vscp_convertLevel1MeasuremenToLevel2DoubleEx(vscpEventEx *pEventEx);
+vscp_convertLevel1MeasurementToLevel2DoubleEx(vscpEventEx *pEventEx);
 
 /*!
  * Convert a Level I measurement event to a Level II string measurement
@@ -1296,7 +1296,7 @@ vscp_convertLevel1MeasuremenToLevel2DoubleEx(vscpEventEx *pEventEx);
  * @return true on success, false otherwise.
  */
 bool
-vscp_convertLevel1MeasuremenToLevel2String(vscpEvent *pEventLevel1);
+vscp_convertLevel1MeasurementToLevel2String(vscpEvent *pEventLevel1);
 
 /*!
  * Convert a Level I measurement event to a Level II string measurement
@@ -1306,7 +1306,7 @@ vscp_convertLevel1MeasuremenToLevel2String(vscpEvent *pEventLevel1);
  * @return true on success, false otherwise.
  */
 bool
-vscp_convertLevel1MeasuremenToLevel2StringEx(vscpEventEx *pEventEx);
+vscp_convertLevel1MeasurementToLevel2StringEx(vscpEventEx *pEventEx);
 
 // -------------------------------------------------------------------------
 

@@ -3244,11 +3244,11 @@ vscp_makeLevel2StringMeasurementEventEx(vscpEventEx *pEventEx,
 }
 
 //////////////////////////////////////////////////////////////////////////////
-// vscp_convertLevel1MeasuremenToLevel2Double
+// vscp_convertLevel1MeasurementToLevel2Double
 //
 
 bool
-vscp_convertLevel1MeasuremenToLevel2Double(vscpEvent *pEvent)
+vscp_convertLevel1MeasurementToLevel2Double(vscpEvent *pEvent)
 {
   double val64;
 
@@ -3403,11 +3403,11 @@ vscp_convertLevel1MeasuremenToLevel2Double(vscpEvent *pEvent)
 }
 
 //////////////////////////////////////////////////////////////////////////////
-// vscp_convertLevel1MeasuremenToLevel2DoubleEx
+// vscp_convertLevel1MeasurementToLevel2DoubleEx
 //
 
 bool
-vscp_convertLevel1MeasuremenToLevel2DoubleEx(vscpEventEx *pEventEx)
+vscp_convertLevel1MeasurementToLevel2DoubleEx(vscpEventEx *pEventEx)
 {
   // Check pointer
   if (nullptr == pEventEx) {
@@ -3424,7 +3424,7 @@ vscp_convertLevel1MeasuremenToLevel2DoubleEx(vscpEventEx *pEventEx)
   if (!vscp_convertEventExToEvent(pEvent, pEventEx)) {
     return false;
   }
-  if (!vscp_convertLevel1MeasuremenToLevel2Double(pEvent)) {
+  if (!vscp_convertLevel1MeasurementToLevel2Double(pEvent)) {
     return false;
   }
   if (!vscp_convertEventToEventEx(pEventEx, pEvent)) {
@@ -3436,11 +3436,11 @@ vscp_convertLevel1MeasuremenToLevel2DoubleEx(vscpEventEx *pEventEx)
 }
 
 //////////////////////////////////////////////////////////////////////////////
-// vscp_convertLevel1MeasuremenToLevel2String
+// vscp_convertLevel1MeasurementToLevel2String
 //
 
 bool
-vscp_convertLevel1MeasuremenToLevel2String(vscpEvent *pEvent)
+vscp_convertLevel1MeasurementToLevel2String(vscpEvent *pEvent)
 {
   std::string strval;
 
@@ -3581,11 +3581,11 @@ vscp_convertLevel1MeasuremenToLevel2String(vscpEvent *pEvent)
 }
 
 //////////////////////////////////////////////////////////////////////////////
-// vscp_convertLevel1MeasuremenToLevel2StringEx
+// vscp_convertLevel1MeasurementToLevel2StringEx
 //
 
 bool
-vscp_convertLevel1MeasuremenToLevel2StringEx(vscpEventEx *pEventEx)
+vscp_convertLevel1MeasurementToLevel2StringEx(vscpEventEx *pEventEx)
 {
   // Check pointer
   if (nullptr == pEventEx) {
@@ -3602,7 +3602,7 @@ vscp_convertLevel1MeasuremenToLevel2StringEx(vscpEventEx *pEventEx)
     return false;
   }
 
-  if (!vscp_convertLevel1MeasuremenToLevel2String(pEvent)) {
+  if (!vscp_convertLevel1MeasurementToLevel2String(pEvent)) {
     return false;
   }
 

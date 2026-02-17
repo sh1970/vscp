@@ -463,12 +463,12 @@ deviceThread(void *pData)
 
           // Level I measurement events to Level II measurement float
           if (pDeviceItem->m_translation & VSCP_DRIVER_OUT_TR_M1_M2F) {
-            vscp_convertLevel1MeasuremenToLevel2Double(&ev);
+            vscp_convertLevel1MeasurementToLevel2Double(&ev);
           }
 
           // Level I measurement events to Level II measurement string
           if (pDeviceItem->m_translation & VSCP_DRIVER_OUT_TR_M1_M2S) {
-            vscp_convertLevel1MeasuremenToLevel2String(&ev);
+            vscp_convertLevel1MeasurementToLevel2String(&ev);
           }
 
           // Level I events to Level I over Level II events
@@ -541,12 +541,12 @@ deviceThread(void *pData)
 
               // Level I measurement events to Level II measurement float
               if (pDeviceItem->m_translation & VSCP_DRIVER_OUT_TR_M1_M2F) {
-                vscp_convertLevel1MeasuremenToLevel2Double(pev);
+                vscp_convertLevel1MeasurementToLevel2Double(pev);
               }
 
               // Level I measurement events to Level II measurement string
               if (pDeviceItem->m_translation & VSCP_DRIVER_OUT_TR_M1_M2S) {
-                vscp_convertLevel1MeasuremenToLevel2String(pev);
+                vscp_convertLevel1MeasurementToLevel2String(pev);
               }
 
               // Level I events to Level I over Level II events
