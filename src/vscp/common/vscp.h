@@ -91,7 +91,7 @@ typedef struct _vscpEvent {
     If year is set to 0xffff a unix UTC timestamp with nanosecond precision is formed by the
     eight byte buffer starting at the day field MSB first.
   */
-  uint16_t year;
+  uint16_t year;  // set to 0xffff for UTC timestamp with nanosecond precision
   uint8_t month; /* 1-12 */
 
   union {
@@ -155,7 +155,7 @@ typedef struct _vscpEventEx {
     If year is set to 0xffff a unix UTC timestamp with nanosecond precision is formed by the eight
     byte buffer starting at the day field MSB first.
   */
-  uint16_t year;
+  uint16_t year;  // set to 0xffff for UTC timestamp with nanosecond precision
   uint8_t month; /* 1-12 */
 
   union {
