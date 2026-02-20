@@ -903,11 +903,11 @@ vscp_parseISOCombined(struct tm *ptm, std::string &dt);
   @param hour Hour
   @param minute Minute
   @param second Second
-  @param microsecond Microsecond
+  @param timestamp Timestamp in microseconds
   @return Unix time in nanoseconds or -1 on error.
 */
 int64_t
-vscp_to_unix_ns(int year, int month, int day, int hour, int minute, int second, uint32_t microsecond);
+vscp_to_unix_ns(int year, int month, int day, int hour, int minute, int second, uint32_t timestamp);
 
 /*!
   @fn vscp_from_unix_ns
@@ -919,7 +919,7 @@ vscp_to_unix_ns(int year, int month, int day, int hour, int minute, int second, 
   @param hour Hour
   @param minute Minute
   @param second Second
-  @param microsecond Microsecond
+  @param timestamp Timestamp in microseconds
 */
 
 void
@@ -930,7 +930,7 @@ vscp_from_unix_ns(int64_t unix_ns,
                   int *hour,
                   int *minute,
                   int *second,
-                  uint32_t *microsecond);
+                  uint32_t *timestamp);
 
 /*!
   @fn vscp_XML_Escape

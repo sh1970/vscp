@@ -924,7 +924,7 @@ static int64_t days_from_civil(int year, int month, int day)
 int64_t to_unix_ns_embedded(
     int year, int month, int day,
     int hour, int minute, int second,
-    uint32_t microsecond)
+    uint32_t timestamp)
 {
     int64_t days = days_from_civil(year, month, day);
     int64_t sec =
@@ -933,13 +933,13 @@ int64_t to_unix_ns_embedded(
         minute * 60LL +
         second;
 
-    return sec * NS_PER_SEC + (int64_t)microsecond * 1000LL;
+    return sec * NS_PER_SEC + (int64_t)timestamp * 1000LL;
 }
 
 int64_t vscp_to_unix_ns(
     int year, int month, int day,
     int hour, int minute, int second,
-    uint32_t microsecond)
+    uint32_t timestamp)
 {
     // Convert date to days since epoch
     int64_t days = days_from_civil(year, month, day);
@@ -953,7 +953,7 @@ int64_t vscp_to_unix_ns(
 
     // Convert to nanoseconds
     return total_seconds * NS_PER_SEC
-           + (int64_t)microsecond * 1000LL;
+           + (int64_t)timestamp * 1000LL;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -984,7 +984,7 @@ void vscp_from_unix_ns(
     int64_t unix_ns,
     int *year, int *month, int *day,
     int *hour, int *minute, int *second,
-    uint32_t *microsecond)
+    uint32_t *timestamp)
 {
     // --- Split seconds and nanoseconds safely ---
     int64_t sec  = unix_ns / NS_PER_SEC;
@@ -1013,7 +1013,7 @@ void vscp_from_unix_ns(
     *minute = (int)(rem / 60);
     *second = (int)(rem % 60);
 
-    *microsecond = (uint32_t)(nsec / 1000);
+    *timestamp = (uint32_t)(nsec / 1000);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
