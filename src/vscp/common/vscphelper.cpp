@@ -5254,6 +5254,96 @@ vscp_convertEventExToHTML(std::string &strHTML, vscpEventEx *pEventEx)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// vscp_parse_topic
+//
+
+int
+vscp_parse_topic(const char *topic, uint8_t *pGuid[16], uint16_t *pVscpClass, uint16_t *pVscpType)
+{
+  // Check pointers
+  if (nullptr == topic) {
+    return -1;
+  }
+
+  if (nullptr == pGuid) {
+    return -1;
+  }
+
+  if (nullptr == pVscpClass) {
+    return -1;
+  }
+
+  if (nullptr == pVscpType) {
+    return -1;
+  }
+
+  // Topic format is:
+  // vscp/class/type/guid
+
+  std::deque<std::string> tokens;
+  std::string topicStr = topic;
+
+  vscp_split(tokens, topicStr, "/");
+  if (tokens.size() != 4) {
+    return -1;
+  }
+
+  *pVscpClass = (uint16_t) std::stoul(tokens[1]);
+  *pVscpType  = (uint16_t) std::stoul(tokens[2]);
+
+  cguid guid;
+  guid.getFromString(tokens[3]);
+  guid.writeGUID(*pGuid);
+
+  return 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// vscp_set_event_info_from_topic
+//
+
+int
+vscp_set_event_info_from_topic(vscpEvent *pev, const char *topic)
+{
+  uint8_t *pGuid[16];
+  uint16_t vscpClass;
+  uint16_t vscpType;
+
+  if (vscp_parse_topic(topic, pGuid, &vscpClass, &vscpType)) {
+    return -1;
+  }
+
+  pev->vscp_class = vscpClass;
+  pev->vscp_type  = vscpType;
+  memcpy(pev->GUID, pGuid, 16);
+
+  return 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// vscp_set_eventex_info_from_topic
+//
+
+int
+vscp_set_eventex_info_from_topic(vscpEventEx *pex, const char *topic)
+{
+  uint8_t *pGuid[16];
+  uint16_t vscpClass;
+  uint16_t vscpType;
+
+  if (vscp_parse_topic(topic, pGuid, &vscpClass, &vscpType)) {
+    return -1;
+  }
+
+  pex->vscp_class = vscpClass;
+  pex->vscp_type  = vscpType;
+  memcpy(pex->GUID, pGuid, 16);
+
+  return 0;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
 // vscp_setEventDateTime
 //
 

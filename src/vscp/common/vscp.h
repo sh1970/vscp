@@ -782,10 +782,10 @@ Data: 1,2,3,4,5,6,7<br>
 From GUID: 00:00:00:00:00:00:00:00:00:00:00:00:00:01:00:02<br>
 </p>
 <p>
-vscpHead: 6 <br>
-DateTime: 2013-11-02T12:34:22Z
-Timestamp: 1234 <br>
-ObId: 1234 <br>
+vscp: 6 <br>
+datetime: 2013-11-02T12:34:22Z
+timestamp: 1234 <br>
+obid: 1234 <br>
 note: This is a note <br>
 </p>
 
@@ -793,23 +793,23 @@ note: This is a note <br>
 #define VSCP_HTML_EVENT_TEMPLATE                                                                                       \
   "<h2>VSCP Event</h2> "                                                                                               \
   "<p>"                                                                                                                \
-  "Class: %d <br>"                                                                                                     \
-  "Type: %d <br>"                                                                                                      \
+  "class: %d <br>"                                                                                                     \
+  "type: %d <br>"                                                                                                      \
   "</p>"                                                                                                               \
   "<p>"                                                                                                                \
-  "Data count: %d<br>"                                                                                                 \
-  "Data: %s<br>"                                                                                                       \
+  "data size: %d<br>"                                                                                                 \
+  "data: %s<br>"                                                                                                       \
   "</p>"                                                                                                               \
   "<p>"                                                                                                                \
-  "From GUID: %s<br>"                                                                                                  \
+  "guid: %s<br>"                                                                                                  \
   "</p>"                                                                                                               \
   "<p>"                                                                                                                \
-  "vscpHead: %d <br>"                                                                                                  \
+  "head: %d <br>"                                                                                                  \
   "<p>"                                                                                                                \
-  "DateTime: %s <br>"                                                                                                  \
+  "datetime: %s <br>"                                                                                                  \
   "</p>"                                                                                                               \
-  "Timestamp: %lu <br>"                                                                                                \
-  "ObId: %lu <br>"                                                                                                     \
+  "timestamp: %lu <br>"                                                                                                \
+  "obid: %lu <br>"                                                                                                     \
   "note: %s <br>"                                                                                                      \
   "</p>"
 
