@@ -67,7 +67,8 @@ typedef struct _vscpEvent {
       Bit 14 - GUID type
       Bit 13 - GUID type
       Bit 12 - GUID type (GUID is IP v.6 address if set and 13/14 is zero.)
-      Bit 8-11 = Reserved
+      Bit 8-9 - Frame version. (0 = original, 1 = frame with Unix ns timestamp, 2 = reserved, 3 = reserved)
+      Bit 10-11 = Reserved
       Bit 765 =  priority, Priority 0-7 where 0 is highest priority.
       Bit 4 = hard coded, true for a hard coded device.
       Bit 3 = Don't calculate CRC, false for CRC usage.
@@ -94,7 +95,7 @@ typedef struct _vscpEvent {
   uint8_t month; /* 1-12 */
 
   union {
-    uint64_t timestamp_ns; /* Unix timestamp with nanosecond precision (when year == 0xffff) */
+    uint64_t timestamp_ns; /* Unix timestamp with nanosecond precision (when frame version = 1) */
     struct {
       uint8_t day;        /* 1-31 */
       uint8_t hour;       /* 0-23 */
@@ -131,7 +132,7 @@ typedef struct _vscpEventEx {
       Bit 14 - GUID type
       Bit 13 - GUID type
       Bit 12 - GUID type (GUID is IP v.6 address if set and 13/14 is zero.)
-      Bit 8-11 = Reserved
+      Bit 8-9 - Frame version. (0 = original, 1 = frame with Unix ns timestamp, 2 = reserved, 3 = reserved)
       Bit 765 =  priority, Priority 0-7 where 0 is highest priority.
       Bit 4 = hard coded, true for a hard coded device.
       Bit 3 = Don't calculate CRC, false for CRC usage.
@@ -158,7 +159,7 @@ typedef struct _vscpEventEx {
   uint8_t month; /* 1-12 */
 
   union {
-    uint64_t timestamp_ns; /* Unix timestamp with nanosecond precision (when year == 0xffff) */
+    uint64_t timestamp_ns; /* Unix timestamp with nanosecond precision (when frame version = 1) */
     struct {
       uint8_t day;        /* 1-31 */
       uint8_t hour;       /* 0-23 */

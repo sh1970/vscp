@@ -2976,12 +2976,12 @@ vscp_makeFloatMeasurementEventEx(vscpEventEx *pEventEx, float value, uint8_t uni
   pEvent->vscp_type  = pEventEx->vscp_type;
   pEvent->obid       = pEventEx->obid;
   pEvent->timestamp  = pEventEx->timestamp;
-  pEvent->obid       = pEventEx->year;
-  pEvent->obid       = pEventEx->month;
-  pEvent->obid       = pEventEx->day;
-  pEvent->obid       = pEventEx->hour;
-  pEvent->obid       = pEventEx->minute;
-  pEvent->obid       = pEventEx->second;
+  pEvent->year       = pEventEx->year;
+  pEvent->month      = pEventEx->month;
+  pEvent->day        = pEventEx->day;
+  pEvent->hour       = pEventEx->hour;
+  pEvent->minute     = pEventEx->minute;
+  pEvent->second     = pEventEx->second;
   memcpy(pEvent->GUID, pEventEx->GUID, 16);
 
   if (!vscp_makeFloatMeasurementEvent(pEvent, value, unit, sensoridx)) {
