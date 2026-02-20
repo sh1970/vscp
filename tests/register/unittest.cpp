@@ -6,14 +6,14 @@
 #include <register.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <vscp_client_base.h>
-#include <vscp_client_canal.h>
-#include <vscp_client_mqtt.h>
-#include <vscp_client_socketcan.h>
-#include <vscp_client_tcp.h>
-#include <vscp_client_udp.h>
-#include <vscp_client_ws1.h>
-#include <vscp_client_ws2.h>
+#include <vscp-client-base.h>
+#include <vscp-client-canal.h>
+#include <vscp-client-mqtt.h>
+#include <vscp-client-socketcan.h>
+#include <vscp-client-tcp.h>
+#include <vscp-client-udp.h>
+#include <vscp-client-ws1.h>
+#include <vscp-client-ws2.h>
 
 #include <vscphelper.h>
 

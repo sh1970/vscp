@@ -43,10 +43,10 @@ add_executable(test
     ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscphelper.cpp
     ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscpremotetcpif.h
     ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscpremotetcpif.cpp
-    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscp_client_base.h
-    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscp_client_base.cpp
-    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscp_client_tcp.h
-    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscp_client_tcp.cpp
+    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscp-client-base.h
+    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscp-client-base.cpp
+    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscp-client-tcp.h
+    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscp-client-tcp.cpp
     ${PROJECT_SOURCE_DIR}/../../src/vscp/common/mdf.h
     ${PROJECT_SOURCE_DIR}/../../src/vscp/common/mdf.cpp
     ${PROJECT_SOURCE_DIR}/../../src/vscp/common/register.h
@@ -62,19 +62,17 @@ add_executable(test
     ${PROJECT_SOURCE_DIR}/../../src/common/crc8.c
     ${PROJECT_SOURCE_DIR}/../../src/common/vscp-aes.h
     ${PROJECT_SOURCE_DIR}/../../src/common/vscp-aes.c
-    ${PROJECT_SOURCE_DIR}/../../src/common/fastpbkdf2.h
-    ${PROJECT_SOURCE_DIR}/../../src/common/fastpbkdf2.c
     ${PROJECT_SOURCE_DIR}/../../src/common/sockettcp.h
     ${PROJECT_SOURCE_DIR}/../../src/common/sockettcp.c
-    ${PROJECT_SOURCE_DIR}/../../src/common/third_party/nlohmann/json.hpp
 )
 
 target_include_directories(test PUBLIC 
     ${PROJECT_SOURCE_DIR}/../../src/vscp/common/
     ${PROJECT_SOURCE_DIR}/../../src/common/
     ${PROJECT_SOURCE_DIR}/../../src/common/third_party
-    ${PROJECT_SOURCE_DIR}/../../src/common/third_party/nlohmann
-    ${PROJECT_SOURCE_DIR}/../../src/common/third_party/spdlog-1.9.2/include/
+    ${PROJECT_SOURCE_DIR}/../../third_party/nlohmann/include/nlohmann
+    ${PROJECT_SOURCE_DIR}/../../third_party/spdlog/include/
+    ${PROJECT_SOURCE_DIR}/../../third_party/mustache/
     ${OPENSSL_INCLUDE_DIR}
     ${EXPAT_INCLUDE_DIRS}
     ${MOSQUITTO_INCLUDE_DIR}

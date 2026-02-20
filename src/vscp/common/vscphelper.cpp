@@ -4924,14 +4924,14 @@ vscp_convertEventToXML(std::string &strXML, vscpEvent *pEvent)
 // vscp_convertXMLToEvent
 //
 // <event
-//     vscpHead = "2"
-//     vscpObId = "123"
-//     vscpDateTime = "2017-01-13T10:16:02"
-//     vscpTimeStamp = "50817"
-//     vscpClass = "10"
-//     vscpType = "8"
-//     vscpGuid = "00:00:00:00:00:00:00:00:00:00:00:00:00:01:00:02"
-//     vscpData = 1,2,3,4,5,6,7"
+//     head = "2"
+//     obid = "123"
+//     datetime = "2017-01-13T10:16:02"
+//     timestamp = "50817"
+//     class = "10"
+//     type = "8"
+//     guid = "00:00:00:00:00:00:00:00:00:00:00:00:00:01:00:02"
+//     data = 1,2,3,4,5,6,7"
 // />
 
 // ----------------------------------------------------------------------------
@@ -4956,13 +4956,13 @@ startEventXMLParser(void *data, const char *name, const char **attr)
     for (int i = 0; attr[i]; i += 2) {
 
       std::string attribute = attr[i + 1];
-      if (0 == strcmp(attr[i], "vscpHead")) {
+      if (0 == strcmp(attr[i], "head")) {
         pev->head = vscp_readStringValue(attribute);
       }
-      else if (0 == strcmp(attr[i], "vscpObId")) {
+      else if (0 == strcmp(attr[i], "obid")) {
         pev->obid = vscp_readStringValue(attribute);
       }
-      else if (0 == strcmp(attr[i], "vscpDateTime")) {
+      else if (0 == strcmp(attr[i], "datetime")) {
         struct tm tm;
         memset(&tm, 0, sizeof(tm));
         std::string dt = attribute;
@@ -4970,20 +4970,20 @@ startEventXMLParser(void *data, const char *name, const char **attr)
           vscp_setEventDateTime(pev, &tm);
         }
       }
-      else if (0 == strcmp(attr[i], "vscpTimeStamp")) {
+      else if (0 == strcmp(attr[i], "timestamp")) {
         pev->timestamp = vscp_readStringValue(attribute);
       }
-      else if (0 == strcmp(attr[i], "vscpClass")) {
+      else if (0 == strcmp(attr[i], "class")) {
         pev->vscp_class = vscp_readStringValue(attribute);
       }
-      else if (0 == strcmp(attr[i], "vscpType")) {
+      else if (0 == strcmp(attr[i], "type")) {
         pev->vscp_type = vscp_readStringValue(attribute);
       }
-      else if (0 == strcmp(attr[i], "vscpGuid")) {
+      else if (0 == strcmp(attr[i], "guid")) {
         std::string strGUID = attribute;
         vscp_setEventGuidFromString(pev, strGUID);
       }
-      else if (0 == strcmp(attr[i], "vscpData")) {
+      else if (0 == strcmp(attr[i], "data")) {
         std::string str = attribute;
         vscp_setEventDataFromString(pev, str);
       }
@@ -5071,14 +5071,14 @@ vscp_convertEventExToXML(std::string &strXML, vscpEventEx *pEventEx)
 // vscp_convertXMLToEventEx
 //
 // <event
-//     vscpHead = "2"
-//     vscpObId = "123"
-//     vscpDateTime = "2017-01-13T10:16:02"
-//     vscpTimeStamp = "50817"
-//     vscpClass = "10"
-//     vscpType = "8"
-//     vscpGuid = "00:00:00:00:00:00:00:00:00:00:00:00:00:01:00:02"
-//     vscpData = 1,2,3,4,5,6,7"
+//     head = "2"
+//     obid = "123"
+//     datetime = "2017-01-13T10:16:02"
+//     timestamp = "50817"
+//     class = "10"
+//     type = "8"
+//     guid = "00:00:00:00:00:00:00:00:00:00:00:00:00:01:00:02"
+//     data = 1,2,3,4,5,6,7"
 // />
 
 // ----------------------------------------------------------------------------
@@ -5103,13 +5103,13 @@ startEventExXMLParser(void *data, const char *name, const char **attr)
     for (int i = 0; attr[i]; i += 2) {
 
       std::string attribute = attr[i + 1];
-      if (0 == strcmp(attr[i], "vscpHead")) {
+      if (0 == strcmp(attr[i], "head")) {
         pex->head = vscp_readStringValue(attribute);
       }
-      else if (0 == strcmp(attr[i], "vscpObId")) {
+      else if (0 == strcmp(attr[i], "obid")) {
         pex->obid = vscp_readStringValue(attribute);
       }
-      else if (0 == strcmp(attr[i], "vscpDateTime")) {
+      else if (0 == strcmp(attr[i], "datetime")) {
         struct tm tm;
         memset(&tm, 0, sizeof(tm));
         std::string dt = attribute;
@@ -5117,20 +5117,20 @@ startEventExXMLParser(void *data, const char *name, const char **attr)
           vscp_setEventExDateTime(pex, &tm);
         }
       }
-      else if (0 == strcmp(attr[i], "vscpTimeStamp")) {
+      else if (0 == strcmp(attr[i], "timestamp")) {
         pex->timestamp = vscp_readStringValue(attribute);
       }
-      else if (0 == strcmp(attr[i], "vscpClass")) {
+      else if (0 == strcmp(attr[i], "class")) {
         pex->vscp_class = vscp_readStringValue(attribute);
       }
-      else if (0 == strcmp(attr[i], "vscpType")) {
+      else if (0 == strcmp(attr[i], "type")) {
         pex->vscp_type = vscp_readStringValue(attribute);
       }
-      else if (0 == strcmp(attr[i], "vscpGuid")) {
+      else if (0 == strcmp(attr[i], "guid")) {
         std::string strGUID = attribute;
         vscp_setEventExGuidFromString(pex, strGUID);
       }
-      else if (0 == strcmp(attr[i], "vscpData")) {
+      else if (0 == strcmp(attr[i], "data")) {
         std::string str = attribute;
         vscp_setEventExDataFromString(pex, str);
       }
