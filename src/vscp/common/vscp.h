@@ -754,7 +754,7 @@ datetime,head,obid,datetime,timestamp,class,type,guid,data,note
   "\"datetime\": \"%s\",\n"                                                                                        \
   "\"timestamp\": %lu,\n"                                                                                          \
   "\"class\": %d,\n"                                                                                               \
-  "\"type\": %d,\n"                                                                                                
+  "\"type\": %d,\n"                                                                                                \
   "\"guid\": \"%s\",\n"                                                                                            \
   "\"data\": [%s],\n"                                                                                              \
   "\"note\": \"%s\"\n"                                                                                             \
