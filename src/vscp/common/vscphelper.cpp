@@ -4614,18 +4614,18 @@ vscp_convertEventToJSON(std::string &strJSON, const vscpEvent *pEvent)
 // vscp_convertJSONToEvent
 //
 // {
-//    "vscpHead": 2,
-//    "vscpObId": 123,
-//    "vscpDateTime": "2017-01-13T10:16:02Z",
-//    "vscpTimeStamp":50817,
-//    "vscpClass": 10,
-//    "vscpType": 8,
-//    "vscpGuid": "00:00:00:00:00:00:00:00:00:00:00:00:00:01:00:02",
-//    "vscpData": [1,2,3,4,5,6,7],
-//    "vscpNote": "This is some text"
+//    "head": 2,
+//    "obid": 123,
+//    "datetime": "2017-01-13T10:16:02Z",
+//    "timestamp":50817,
+//    "class": 10,
+//    "type": 8,
+//    "guid": "00:00:00:00:00:00:00:00:00:00:00:00:00:01:00:02",
+//    "data": [1,2,3,4,5,6,7],
+//    "note": "This is some text"
 // }
 //
-// All fields must exist except vscpNote which is ignored.
+// All fields must exist except note which is ignored.
 //
 
 bool
@@ -4644,21 +4644,21 @@ vscp_convertJSONToEvent(vscpEvent *pEvent, std::string &strJSON)
   try {
     auto j = json::parse(strJSON);
 
-    // vscpHead
+    // head
     pEvent->head = 0;
-    if (j.contains("vscpHead") && j["vscpHead"].is_number_unsigned()) {
-      pEvent->head = j.at("vscpHead").get<uint16_t>();
+    if (j.contains("head") && j["head"].is_number_unsigned()) {
+      pEvent->head = j.at("head").get<uint16_t>();
     }
 
-    // vscpObId
+    // obid
     pEvent->obid = 0;
-    if (j.contains("vscpObId") && j["vscpObId"].is_number_unsigned()) {
-      pEvent->obid = j.at("vscpObId").get<uint32_t>();
+    if (j.contains("obid") && j["obid"].is_number_unsigned()) {
+      pEvent->obid = j.at("obid").get<uint32_t>();
     }
 
-    // vscpTimeStamp
-    if (j.contains("vscpTimeStamp") && j["vscpTimeStamp"].is_number_unsigned()) {
-      pEvent->timestamp = j.at("vscpTimeStamp").get<uint32_t>();
+    // timestamp
+    if (j.contains("timestamp") && j["timestamp"].is_number_unsigned()) {
+      pEvent->timestamp = j.at("timestamp").get<uint32_t>();
     }
 
     // If timestamp is zero set a timestamp here
@@ -4666,10 +4666,10 @@ vscp_convertJSONToEvent(vscpEvent *pEvent, std::string &strJSON)
       pEvent->timestamp = vscp_makeTimeStamp();
     }
 
-    // vscpDateTime
+    // datetime - if not set use current time
     vscp_setEventToNow(pEvent);
-    if (j.contains("vscpDateTime") && j["vscpDateTime"].is_string()) {
-      std::string dtStr = j.at("vscpDateTime").get<std::string>();
+    if (j.contains("datetime") && j["datetime"].is_string()) {
+      std::string dtStr = j.at("datetime").get<std::string>();
       struct tm tm;
       memset(&tm, 0, sizeof(tm));
       if (vscp_parseISOCombined(&tm, dtStr)) {
@@ -4679,20 +4679,20 @@ vscp_convertJSONToEvent(vscpEvent *pEvent, std::string &strJSON)
 
     // VSCP class
     pEvent->vscp_class = 0;
-    if (j.contains("vscpClass") && j["vscpClass"].is_number_unsigned()) {
-      pEvent->vscp_class = j.at("vscpClass").get<uint16_t>();
+    if (j.contains("class") && j["class"].is_number_unsigned()) {
+      pEvent->vscp_class = j.at("class").get<uint16_t>();
     }
 
     // VSCP type
     pEvent->vscp_type = 0;
-    if (j.contains("vscpType") && j["vscpType"].is_number_unsigned()) {
-      pEvent->vscp_type = j.at("vscpType").get<uint16_t>();
+    if (j.contains("type") && j["type"].is_number_unsigned()) {
+      pEvent->vscp_type = j.at("type").get<uint16_t>();
     }
 
     // GUID
     memset(pEvent->GUID, 0, 16);
-    if (j.contains("vscpGuid") && j["vscpGuid"].is_string()) {
-      std::string guidStr = j.at("vscpGuid").get<std::string>();
+    if (j.contains("guid") && j["guid"].is_string()) {
+      std::string guidStr = j.at("guid").get<std::string>();
       cguid guid;
       guid.getFromString(guidStr);
       guid.writeGUID(pEvent->GUID);
@@ -4700,9 +4700,8 @@ vscp_convertJSONToEvent(vscpEvent *pEvent, std::string &strJSON)
 
     pEvent->sizeData = 0;
     pEvent->pdata    = nullptr;
-    if (j.contains("vscpData") && j["vscpData"].is_array()) {
-      std::vector<std::uint8_t> data_array = j.at("vscpData");
-
+    if (j.contains("data") && j["data"].is_array()) {
+      std::vector<std::uint8_t> data_array = j.at("data");
       // Check size
       if (data_array.size() > VSCP_MAX_DATA) {
         return false;
@@ -4774,14 +4773,14 @@ vscp_convertEventExToJSON(std::string &strJSON, const vscpEventEx *pEventEx)
 // vscp_convertJSONToEventEx
 //
 // {
-//    "vscpHead": 2,
-//    "vscpObId"; 123,
-//    "vscpDateTime": "2017-01-13T10:16:02Z",
-//    "vscpTimeStamp":50817,
-//    "vscpClass": 10,
-//    "vscpType": 8,
-//    "vscpGuid": "00:00:00:00:00:00:00:00:00:00:00:00:00:01:00:02",
-//    "vscpData": [1,2,3,4,5,6,7]
+//    "head": 2,
+//    "obid"; 123,
+//    "datetime": "2017-01-13T10:16:02Z",
+//    "timestamp":50817,
+//    "class": 10,
+//    "type": 8,
+//    "guid": "00:00:00:00:00:00:00:00:00:00:00:00:00:01:00:02",
+//    "data": [1,2,3,4,5,6,7]
 // }
 
 bool
@@ -4803,20 +4802,20 @@ vscp_convertJSONToEventEx(vscpEventEx *pEventEx, std::string &strJSON)
 
     // Head
     pEventEx->head = 0;
-    if (j.contains("vscpHead") && j["vscpHead"].is_number_unsigned()) {
-      pEventEx->head = j.at("vscpHead").get<uint16_t>();
+    if (j.contains("head") && j["head"].is_number_unsigned()) {
+      pEventEx->head = j.at("head").get<uint16_t>();
     }
 
     // obid
     pEventEx->obid = 0;
-    if (j.contains("vscpObId") && j["vscpObId"].is_number_unsigned()) {
-      pEventEx->obid = j.at("vscpObId").get<uint32_t>();
+    if (j.contains("obid") && j["obid"].is_number_unsigned()) {
+      pEventEx->obid = j.at("obid").get<uint32_t>();
     }
 
     // TimeStamp
     pEventEx->timestamp = 0;
-    if (j.contains("vscpTimeStamp") && j["vscpTimeStamp"].is_number_unsigned()) {
-      pEventEx->timestamp = j.at("vscpTimeStamp").get<uint32_t>();
+    if (j.contains("timestamp") && j["timestamp"].is_number_unsigned()) {
+      pEventEx->timestamp = j.at("timestamp").get<uint32_t>();
     }
 
     // If timestamp is zero set a timestamp here
@@ -4826,8 +4825,8 @@ vscp_convertJSONToEventEx(vscpEventEx *pEventEx, std::string &strJSON)
 
     // DateTime
     vscp_setEventExToNow(pEventEx);
-    if (j.contains("vscpDateTime") && j["vscpDateTime"].is_string()) {
-      std::string dtStr = j.at("vscpDateTime").get<std::string>();
+    if (j.contains("datetime") && j["datetime"].is_string()) {
+      std::string dtStr = j.at("datetime").get<std::string>();
       struct tm tm;
       memset(&tm, 0, sizeof(tm));
       vscp_parseISOCombined(&tm, dtStr);
@@ -4836,28 +4835,28 @@ vscp_convertJSONToEventEx(vscpEventEx *pEventEx, std::string &strJSON)
 
     // VSCP class
     pEventEx->vscp_class = 0;
-    if (j.contains("vscpClass") && j["vscpClass"].is_number_unsigned()) {
-      pEventEx->vscp_class = j.at("vscpClass").get<uint16_t>();
+    if (j.contains("class") && j["class"].is_number_unsigned()) {
+      pEventEx->vscp_class = j.at("class").get<uint16_t>();
     }
 
     // VSCP type
     pEventEx->vscp_type = 0;
-    if (j.contains("vscpType") && j["vscpType"].is_number_unsigned()) {
-      pEventEx->vscp_type = j.at("vscpType").get<uint16_t>();
+    if (j.contains("type") && j["type"].is_number_unsigned()) {
+      pEventEx->vscp_type = j.at("type").get<uint16_t>();
     }
 
     // GUID
     memset(pEventEx->GUID, 0, 16);
-    if (j.contains("vscpGuid") && j["vscpGuid"].is_string()) {
-      std::string guidStr = j.at("vscpGuid").get<std::string>();
+    if (j.contains("guid") && j["guid"].is_string()) {
+      std::string guidStr = j.at("guid").get<std::string>();
       cguid guid;
       guid.getFromString(guidStr);
       guid.writeGUID(pEventEx->GUID);
     }
 
     pEventEx->sizeData = 0;
-    if (j.contains("vscpData") && j["vscpData"].is_array()) {
-      std::vector<std::uint8_t> data_array = j.at("vscpData");
+    if (j.contains("data") && j["data"].is_array()) {
+      std::vector<std::uint8_t> data_array = j.at("data");
 
       // Check size
       if (data_array.size() > VSCP_MAX_DATA) {
