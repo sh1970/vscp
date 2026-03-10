@@ -2247,10 +2247,10 @@ vscp_readFilterFromString(vscpEventFilter *pFilter, const std::string &strFilter
 
 /*!
   @fn vscp_writeFilterToString
-  Write filter to string
-  @param pFilter Filter structure to write out to string.
+  @brief Write filter to string
   @param strFilter Filter in string form
           filter-priority, filter-class, filter-type, filter-GUID
+  @param pFilter Filter structure to write out to string.
   @return true on success, false on failure.
 */
 bool
@@ -2276,14 +2276,14 @@ vscp_readMaskFromString(vscpEventFilter *pFilter, const std::string &strMask);
 
 /*!
   @fn vscp_writeMaskToString
-  Write mask to string
-  @param pFilter Filter structure to write out to string.
-  @param strFilter Mask in string form
+  @brief Write mask to string
+  @param strMask Mask in string form
           mask-priority, mask-class, mask-type, mask-GUID
+  @param pFilter Filter structure to write out to string.
   @return true on success, false on failure.
 */
 bool
-vscp_writeMaskToString(std::string &strFilter, const vscpEventFilter *pFilter);
+vscp_writeMaskToString(std::string &strMask, const vscpEventFilter *pFilter);
 
 /*!
   @fn vscp_readFilterMaskFromString
