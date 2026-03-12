@@ -283,7 +283,7 @@ vscp_sem_wait(sem_t *sem, uint32_t waitms)
   // Linux version with sem_timedwait (only on Linux with GNU extensions)
   uint64_t ns;
   struct timespec ts;
-  
+
   if (-1 == clock_gettime(CLOCK_REALTIME, &ts)) {
     return -1;
   }
@@ -295,22 +295,22 @@ vscp_sem_wait(sem_t *sem, uint32_t waitms)
   return sem_timedwait(sem, &ts);
 #else
   // Portable version using sem_trywait with polling (macOS, BSD, other Unix)
-  uint32_t elapsed = 0;
+  uint32_t elapsed        = 0;
   const uint32_t sleep_ms = 1; // Sleep 1ms between attempts
-  
+
   while (elapsed < waitms) {
     if (sem_trywait(sem) == 0) {
       return 0; // Successfully acquired semaphore
     }
-    
+
     if (errno != EAGAIN) {
       return -1; // Real error
     }
-    
+
     usleep(sleep_ms * 1000); // Sleep 1ms
     elapsed += sleep_ms;
   }
-  
+
   return ETIMEDOUT; // Timeout
 #endif
 }
@@ -321,21 +321,22 @@ vscp_sem_wait(sem_t *sem, uint32_t waitms)
 //
 
 #ifdef WIN32
-int vscp_sem_post(HANDLE *phHandle)
+int
+vscp_sem_post(HANDLE *phHandle)
 {
-  ReleaseSemaphore(*phHandle,  // handle to semaphore
-                    1,         // increase count by one
-                    NULL);
+  ReleaseSemaphore(*phHandle, // handle to semaphore
+                   1,         // increase count by one
+                   NULL);
   return 0;
 }
 #else
-int vscp_sem_post(sem_t *sem)
+int
+vscp_sem_post(sem_t *sem)
 {
   sem_post(sem);
   return 0;
 }
 #endif
-
 
 #ifdef WIN32
 static void
@@ -901,119 +902,109 @@ vscp_parseISOCombined(struct tm *ptm, std::string &dt)
   return true;
 }
 
-
 ///////////////////////////////////////////////////////////////////////////////
 // vscp_to_unix_ns
 //
 
-#define NS_PER_SEC     1000000000LL
-#define SECS_PER_DAY   86400LL
+#define NS_PER_SEC   1000000000LL
+#define SECS_PER_DAY 86400LL
 
 // Convert civil date to days since 1970-01-01 (Unix epoch)
-static int64_t days_from_civil(int year, int month, int day)
+static int64_t
+days_from_civil(int year, int month, int day)
 {
-    year -= (month <= 2);
-    int era = (year >= 0 ? year : year - 399) / 400;
-    unsigned yoe = (unsigned)(year - era * 400);  // [0, 399]
-    unsigned doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5
-                   + day - 1;                    // [0, 365]
-    unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy; // [0,146096]
-    return era * 146097LL + (int64_t)doe - 719468LL;
+  year -= (month <= 2);
+  int era      = (year >= 0 ? year : year - 399) / 400;
+  unsigned yoe = (unsigned) (year - era * 400);                            // [0, 399]
+  unsigned doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1; // [0, 365]
+  unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;                    // [0,146096]
+  return era * 146097LL + (int64_t) doe - 719468LL;
 }
 
-int64_t to_unix_ns_embedded(
-    int year, int month, int day,
-    int hour, int minute, int second,
-    uint32_t timestamp)
+int64_t
+to_unix_ns_embedded(int year, int month, int day, int hour, int minute, int second, uint32_t timestamp)
 {
-    int64_t days = days_from_civil(year, month, day);
-    int64_t sec =
-        days * SECS_PER_DAY +
-        hour * 3600LL +
-        minute * 60LL +
-        second;
+  int64_t days = days_from_civil(year, month, day);
+  int64_t sec  = days * SECS_PER_DAY + hour * 3600LL + minute * 60LL + second;
 
-    return sec * NS_PER_SEC + (int64_t)timestamp * 1000LL;
+  return sec * NS_PER_SEC + (int64_t) timestamp * 1000LL;
 }
 
-int64_t vscp_to_unix_ns(
-    int year, int month, int day,
-    int hour, int minute, int second,
-    uint32_t timestamp)
+int64_t
+vscp_to_unix_ns(int year, int month, int day, int hour, int minute, int second, uint32_t timestamp)
 {
-    // Convert date to days since epoch
-    int64_t days = days_from_civil(year, month, day);
+  // Convert date to days since epoch
+  int64_t days = days_from_civil(year, month, day);
 
-    // Convert everything to seconds
-    int64_t total_seconds =
-        days * SECS_PER_DAY +
-        hour   * 3600LL +
-        minute * 60LL +
-        second;
+  // Convert everything to seconds
+  int64_t total_seconds = days * SECS_PER_DAY + hour * 3600LL + minute * 60LL + second;
 
-    // Convert to nanoseconds
-    return total_seconds * NS_PER_SEC
-           + (int64_t)timestamp * 1000LL;
+  // Convert to nanoseconds
+  return total_seconds * NS_PER_SEC + (int64_t) timestamp * 1000LL;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // vscp_from_unix_ns
 //
 
-static void civil_from_days(int64_t z,
-                            int *y, int *m, int *d)
+static void
+civil_from_days(int64_t z, int *y, int *m, int *d)
 {
-    // z = days since 1970-01-01
-    z += 719468;  // shift to civil 0000-03-01 base
+  // z = days since 1970-01-01
+  z += 719468; // shift to civil 0000-03-01 base
 
-    int64_t era = (z >= 0 ? z : z - 146096) / 146097;
-    unsigned doe = (unsigned)(z - era * 146097);          // [0, 146096]
-    unsigned yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365;
-    int64_t y_full = (int64_t)yoe + era * 400;
-    unsigned doy = doe - (365*yoe + yoe/4 - yoe/100);
-    unsigned mp = (5*doy + 2)/153;
-    unsigned d_full = doy - (153*mp+2)/5 + 1;
-    unsigned m_full = mp + (mp < 10 ? 3 : -9);
+  int64_t era     = (z >= 0 ? z : z - 146096) / 146097;
+  unsigned doe    = (unsigned) (z - era * 146097); // [0, 146096]
+  unsigned yoe    = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+  int64_t y_full  = (int64_t) yoe + era * 400;
+  unsigned doy    = doe - (365 * yoe + yoe / 4 - yoe / 100);
+  unsigned mp     = (5 * doy + 2) / 153;
+  unsigned d_full = doy - (153 * mp + 2) / 5 + 1;
+  unsigned m_full = mp + (mp < 10 ? 3 : -9);
 
-    *y = (int)(y_full + (m_full <= 2));
-    *m = (int)m_full;
-    *d = (int)d_full;
+  *y = (int) (y_full + (m_full <= 2));
+  *m = (int) m_full;
+  *d = (int) d_full;
 }
 
-void vscp_from_unix_ns(
-    int64_t unix_ns,
-    int *year, int *month, int *day,
-    int *hour, int *minute, int *second,
-    uint32_t *timestamp)
+void
+vscp_from_unix_ns(int64_t unix_ns,
+                  int *year,
+                  int *month,
+                  int *day,
+                  int *hour,
+                  int *minute,
+                  int *second,
+                  uint32_t *timestamp)
 {
-    // --- Split seconds and nanoseconds safely ---
-    int64_t sec  = unix_ns / NS_PER_SEC;
-    int64_t nsec = unix_ns % NS_PER_SEC;
+  // --- Split seconds and nanoseconds safely ---
+  int64_t sec  = unix_ns / NS_PER_SEC;
+  int64_t nsec = unix_ns % NS_PER_SEC;
 
-    if (nsec < 0) {
-        sec--;
-        nsec += NS_PER_SEC;
-    }
+  if (nsec < 0) {
+    sec--;
+    nsec += NS_PER_SEC;
+  }
 
-    // --- Split days and time-of-day ---
-    int64_t days = sec / SECS_PER_DAY;
-    int64_t rem  = sec % SECS_PER_DAY;
+  // --- Split days and time-of-day ---
+  int64_t days = sec / SECS_PER_DAY;
+  int64_t rem  = sec % SECS_PER_DAY;
 
-    if (rem < 0) {
-        rem += SECS_PER_DAY;
-        days--;
-    }
+  if (rem < 0) {
+    rem += SECS_PER_DAY;
+    days--;
+  }
 
-    // --- Convert days → Y/M/D ---
-    civil_from_days(days, year, month, day);
+  // --- Convert days → Y/M/D ---
+  civil_from_days(days, year, month, day);
 
-    // --- Convert remainder → H:M:S ---
-    *hour   = (int)(rem / 3600);
-    rem    %= 3600;
-    *minute = (int)(rem / 60);
-    *second = (int)(rem % 60);
+  // --- Convert remainder → H:M:S ---
+  *hour = (int) (rem / 3600);
+  rem %= 3600;
+  *minute = (int) (rem / 60);
+  *second = (int) (rem % 60);
 
-    *timestamp = (uint32_t)(nsec / 1000);
+  *timestamp = (uint32_t) (nsec / 1000);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -3986,33 +3977,27 @@ vscp_setEventExGuidFromString(vscpEventEx *pEvent, const std::string &strGUID)
 ///////////////////////////////////////////////////////////////////////////////
 // vscp_getGuidFromStringToArray
 //
+// Accepts all GUID string formats:
+// - Standard colon-separated: "FF:AA:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE"
+// - UUID format: "FFAA1122-3344-5566-7788-99AABBCCDDEE"
+// - Compact format with :: for leading 0xFF: "::11:22:33" -> FF:FF:...:11:22:33
+// - "-" for all zeros
+// - "-:" for leading zeros: "-:11:22:33" -> 00:00:...:11:22:33
+// - With braces: "{FF:AA:11:...}"
+// - Various separators: colon, dash, comma
+//
 
 bool
 vscp_getGuidFromStringToArray(unsigned char *pGUID, const std::string &strGUID)
 {
-  std::string str = vscp_trim_copy(strGUID);
-
   if (nullptr == pGUID) {
     return false;
   }
 
-  // If GUID is empty or "-" set all to zero
-  if ((0 == str.length()) || (0 == str.compare("-"))) {
-    memset(pGUID, 0, 16);
-    return true;
-  }
-
-  uint8_t cnt = 0;
-  std::deque<std::string> tokens;
-  vscp_split(tokens, strGUID, ":");
-  while (tokens.size()) {
-    if (cnt > 15) {
-      return false;
-    }
-    std::size_t pos;
-    pGUID[cnt++] = (uint8_t) std::stoul(tokens.front(), &pos, 16);
-    tokens.pop_front();
-  }
+  // Use cguid class which handles all GUID string formats
+  cguid guid;
+  guid.getFromString(strGUID);
+  memcpy(pGUID, guid.getGUID(), 16);
 
   return true;
 }
@@ -4022,33 +4007,101 @@ vscp_getGuidFromStringToArray(unsigned char *pGUID, const std::string &strGUID)
 //
 
 bool
-vscp_writeGuidToString(std::string &strGUID, const vscpEvent *pEvent)
+vscp_writeGuidToString(std::string &strGUID, const vscpEvent *pEvent, vscp_guid_str_format format)
 {
   // Check pointer
   if (nullptr == pEvent) {
     return false;
   }
 
-  strGUID = vscp_str_format("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%"
-                            "02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X",
-                            pEvent->GUID[0],
-                            pEvent->GUID[1],
-                            pEvent->GUID[2],
-                            pEvent->GUID[3],
-                            pEvent->GUID[4],
-                            pEvent->GUID[5],
-                            pEvent->GUID[6],
-                            pEvent->GUID[7],
-                            pEvent->GUID[8],
-                            pEvent->GUID[9],
-                            pEvent->GUID[10],
-                            pEvent->GUID[11],
-                            pEvent->GUID[12],
-                            pEvent->GUID[13],
-                            pEvent->GUID[14],
-                            pEvent->GUID[15]);
+  switch (format) {
+    case VSCP_GUID_STR_FORMAT_COMPACT: {
+      // Count leading 0xFF bytes
+      int ffCount = 0;
+      while (ffCount < 16 && pEvent->GUID[ffCount] == 0xFF) {
+        ffCount++;
+      }
+      // All 0xFF
+      if (ffCount == 16) {
+        strGUID = "::";
+        return true;
+      }
+      // No leading 0xFF bytes - use standard format
+      if (ffCount == 0) {
+        strGUID = vscp_str_format("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:"
+                                  "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X",
+                                  pEvent->GUID[0],
+                                  pEvent->GUID[1],
+                                  pEvent->GUID[2],
+                                  pEvent->GUID[3],
+                                  pEvent->GUID[4],
+                                  pEvent->GUID[5],
+                                  pEvent->GUID[6],
+                                  pEvent->GUID[7],
+                                  pEvent->GUID[8],
+                                  pEvent->GUID[9],
+                                  pEvent->GUID[10],
+                                  pEvent->GUID[11],
+                                  pEvent->GUID[12],
+                                  pEvent->GUID[13],
+                                  pEvent->GUID[14],
+                                  pEvent->GUID[15]);
+        return true;
+      }
+      // Some leading 0xFF bytes - use :: notation
+      strGUID = "::";
+      for (int i = ffCount; i < 16; i++) {
+        if (i > ffCount) {
+          strGUID += ":";
+        }
+        strGUID += vscp_str_format("%02X", pEvent->GUID[i]);
+      }
+      return true;
+    }
 
-  return true;
+    case VSCP_GUID_STR_FORMAT_UUID:
+      // Format: 8-4-4-4-12 hex digits with dashes
+      strGUID = vscp_str_format("%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X",
+                                pEvent->GUID[0],
+                                pEvent->GUID[1],
+                                pEvent->GUID[2],
+                                pEvent->GUID[3],
+                                pEvent->GUID[4],
+                                pEvent->GUID[5],
+                                pEvent->GUID[6],
+                                pEvent->GUID[7],
+                                pEvent->GUID[8],
+                                pEvent->GUID[9],
+                                pEvent->GUID[10],
+                                pEvent->GUID[11],
+                                pEvent->GUID[12],
+                                pEvent->GUID[13],
+                                pEvent->GUID[14],
+                                pEvent->GUID[15]);
+      return true;
+
+    case VSCP_GUID_STR_FORMAT_NORMAL:
+    default:
+      strGUID = vscp_str_format("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:"
+                                "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X",
+                                pEvent->GUID[0],
+                                pEvent->GUID[1],
+                                pEvent->GUID[2],
+                                pEvent->GUID[3],
+                                pEvent->GUID[4],
+                                pEvent->GUID[5],
+                                pEvent->GUID[6],
+                                pEvent->GUID[7],
+                                pEvent->GUID[8],
+                                pEvent->GUID[9],
+                                pEvent->GUID[10],
+                                pEvent->GUID[11],
+                                pEvent->GUID[12],
+                                pEvent->GUID[13],
+                                pEvent->GUID[14],
+                                pEvent->GUID[15]);
+      return true;
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -4056,33 +4109,101 @@ vscp_writeGuidToString(std::string &strGUID, const vscpEvent *pEvent)
 //
 
 bool
-vscp_writeGuidToStringEx(std::string &strGUID, const vscpEventEx *pEvent)
+vscp_writeGuidToStringEx(std::string &strGUID, const vscpEventEx *pEvent, vscp_guid_str_format format)
 {
   // Check pointer
   if (nullptr == pEvent) {
     return false;
   }
 
-  strGUID = vscp_str_format("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%"
-                            "02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X",
-                            pEvent->GUID[0],
-                            pEvent->GUID[1],
-                            pEvent->GUID[2],
-                            pEvent->GUID[3],
-                            pEvent->GUID[4],
-                            pEvent->GUID[5],
-                            pEvent->GUID[6],
-                            pEvent->GUID[7],
-                            pEvent->GUID[8],
-                            pEvent->GUID[9],
-                            pEvent->GUID[10],
-                            pEvent->GUID[11],
-                            pEvent->GUID[12],
-                            pEvent->GUID[13],
-                            pEvent->GUID[14],
-                            pEvent->GUID[15]);
+  switch (format) {
+    case VSCP_GUID_STR_FORMAT_COMPACT: {
+      // Count leading 0xFF bytes
+      int ffCount = 0;
+      while (ffCount < 16 && pEvent->GUID[ffCount] == 0xFF) {
+        ffCount++;
+      }
+      // All 0xFF
+      if (ffCount == 16) {
+        strGUID = "::";
+        return true;
+      }
+      // No leading 0xFF bytes - use standard format
+      if (ffCount == 0) {
+        strGUID = vscp_str_format("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:"
+                                  "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X",
+                                  pEvent->GUID[0],
+                                  pEvent->GUID[1],
+                                  pEvent->GUID[2],
+                                  pEvent->GUID[3],
+                                  pEvent->GUID[4],
+                                  pEvent->GUID[5],
+                                  pEvent->GUID[6],
+                                  pEvent->GUID[7],
+                                  pEvent->GUID[8],
+                                  pEvent->GUID[9],
+                                  pEvent->GUID[10],
+                                  pEvent->GUID[11],
+                                  pEvent->GUID[12],
+                                  pEvent->GUID[13],
+                                  pEvent->GUID[14],
+                                  pEvent->GUID[15]);
+        return true;
+      }
+      // Some leading 0xFF bytes - use :: notation
+      strGUID = "::";
+      for (int i = ffCount; i < 16; i++) {
+        if (i > ffCount) {
+          strGUID += ":";
+        }
+        strGUID += vscp_str_format("%02X", pEvent->GUID[i]);
+      }
+      return true;
+    }
 
-  return true;
+    case VSCP_GUID_STR_FORMAT_UUID:
+      // Format: 8-4-4-4-12 hex digits with dashes
+      strGUID = vscp_str_format("%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X",
+                                pEvent->GUID[0],
+                                pEvent->GUID[1],
+                                pEvent->GUID[2],
+                                pEvent->GUID[3],
+                                pEvent->GUID[4],
+                                pEvent->GUID[5],
+                                pEvent->GUID[6],
+                                pEvent->GUID[7],
+                                pEvent->GUID[8],
+                                pEvent->GUID[9],
+                                pEvent->GUID[10],
+                                pEvent->GUID[11],
+                                pEvent->GUID[12],
+                                pEvent->GUID[13],
+                                pEvent->GUID[14],
+                                pEvent->GUID[15]);
+      return true;
+
+    case VSCP_GUID_STR_FORMAT_NORMAL:
+    default:
+      strGUID = vscp_str_format("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:"
+                                "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X",
+                                pEvent->GUID[0],
+                                pEvent->GUID[1],
+                                pEvent->GUID[2],
+                                pEvent->GUID[3],
+                                pEvent->GUID[4],
+                                pEvent->GUID[5],
+                                pEvent->GUID[6],
+                                pEvent->GUID[7],
+                                pEvent->GUID[8],
+                                pEvent->GUID[9],
+                                pEvent->GUID[10],
+                                pEvent->GUID[11],
+                                pEvent->GUID[12],
+                                pEvent->GUID[13],
+                                pEvent->GUID[14],
+                                pEvent->GUID[15]);
+      return true;
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -4158,55 +4279,126 @@ vscp_writeGuidToString4RowsEx(std::string &strGUID, const vscpEventEx *pEvent)
 //
 
 bool
-vscp_writeGuidArrayToString(std::string &strGUID, const unsigned char *pGUID, bool bUseComma)
+vscp_writeGuidArrayToString(std::string &strGUID,
+                            const unsigned char *pGUID,
+                            bool bUseComma,
+                            vscp_guid_str_format format)
 {
   // Check pointer
   if (nullptr == pGUID) {
     return false;
   }
 
-  if (bUseComma) {
-    strGUID = vscp_str_format("%d,%d,%d,%d,%d,%d,%d,%d,%"
-                              "d,%d,%d,%d,%d,%d,%d,%d",
-                              pGUID[0],
-                              pGUID[1],
-                              pGUID[2],
-                              pGUID[3],
-                              pGUID[4],
-                              pGUID[5],
-                              pGUID[6],
-                              pGUID[7],
-                              pGUID[8],
-                              pGUID[9],
-                              pGUID[10],
-                              pGUID[11],
-                              pGUID[12],
-                              pGUID[13],
-                              pGUID[14],
-                              pGUID[15]);
-  }
-  else {
-    strGUID = vscp_str_format("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:%"
-                              "02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X",
-                              pGUID[0],
-                              pGUID[1],
-                              pGUID[2],
-                              pGUID[3],
-                              pGUID[4],
-                              pGUID[5],
-                              pGUID[6],
-                              pGUID[7],
-                              pGUID[8],
-                              pGUID[9],
-                              pGUID[10],
-                              pGUID[11],
-                              pGUID[12],
-                              pGUID[13],
-                              pGUID[14],
-                              pGUID[15]);
-  }
+  switch (format) {
+    case VSCP_GUID_STR_FORMAT_COMPACT: {
+      // Count leading 0xFF bytes
+      int ffCount = 0;
+      while (ffCount < 16 && pGUID[ffCount] == 0xFF) {
+        ffCount++;
+      }
+      // All 0xFF
+      if (ffCount == 16) {
+        strGUID = "::";
+        return true;
+      }
+      // No leading 0xFF bytes - use standard format
+      if (ffCount == 0) {
+        strGUID = vscp_str_format("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:"
+                                  "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X",
+                                  pGUID[0],
+                                  pGUID[1],
+                                  pGUID[2],
+                                  pGUID[3],
+                                  pGUID[4],
+                                  pGUID[5],
+                                  pGUID[6],
+                                  pGUID[7],
+                                  pGUID[8],
+                                  pGUID[9],
+                                  pGUID[10],
+                                  pGUID[11],
+                                  pGUID[12],
+                                  pGUID[13],
+                                  pGUID[14],
+                                  pGUID[15]);
+        return true;
+      }
+      // Some leading 0xFF bytes - use :: notation
+      strGUID = "::";
+      for (int i = ffCount; i < 16; i++) {
+        if (i > ffCount) {
+          strGUID += ":";
+        }
+        strGUID += vscp_str_format("%02X", pGUID[i]);
+      }
+      return true;
+    }
 
-  return true;
+    case VSCP_GUID_STR_FORMAT_UUID:
+      // Format: 8-4-4-4-12 hex digits with dashes
+      strGUID = vscp_str_format("%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X",
+                                pGUID[0],
+                                pGUID[1],
+                                pGUID[2],
+                                pGUID[3],
+                                pGUID[4],
+                                pGUID[5],
+                                pGUID[6],
+                                pGUID[7],
+                                pGUID[8],
+                                pGUID[9],
+                                pGUID[10],
+                                pGUID[11],
+                                pGUID[12],
+                                pGUID[13],
+                                pGUID[14],
+                                pGUID[15]);
+      return true;
+
+    case VSCP_GUID_STR_FORMAT_NORMAL:
+    default:
+      if (bUseComma) {
+        strGUID = vscp_str_format("%d,%d,%d,%d,%d,%d,%d,%d,"
+                                  "%d,%d,%d,%d,%d,%d,%d,%d",
+                                  pGUID[0],
+                                  pGUID[1],
+                                  pGUID[2],
+                                  pGUID[3],
+                                  pGUID[4],
+                                  pGUID[5],
+                                  pGUID[6],
+                                  pGUID[7],
+                                  pGUID[8],
+                                  pGUID[9],
+                                  pGUID[10],
+                                  pGUID[11],
+                                  pGUID[12],
+                                  pGUID[13],
+                                  pGUID[14],
+                                  pGUID[15]);
+      }
+      else {
+        strGUID = vscp_str_format("%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X:"
+                                  "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X",
+                                  pGUID[0],
+                                  pGUID[1],
+                                  pGUID[2],
+                                  pGUID[3],
+                                  pGUID[4],
+                                  pGUID[5],
+                                  pGUID[6],
+                                  pGUID[7],
+                                  pGUID[8],
+                                  pGUID[9],
+                                  pGUID[10],
+                                  pGUID[11],
+                                  pGUID[12],
+                                  pGUID[13],
+                                  pGUID[14],
+                                  pGUID[15]);
+      }
+      return true;
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -4291,16 +4483,24 @@ vscp_convertEventToEventEx(vscpEventEx *pEventEx, const vscpEvent *pEvent)
   }
 
   // Convert
-  pEventEx->crc        = pEvent->crc;
-  pEventEx->obid       = pEvent->obid;
-  pEventEx->year       = pEvent->year;
-  pEventEx->month      = pEvent->month;
-  pEventEx->day        = pEvent->day;
-  pEventEx->hour       = pEvent->hour;
-  pEventEx->minute     = pEvent->minute;
-  pEventEx->second     = pEvent->second;
-  pEventEx->timestamp  = pEvent->timestamp;
-  pEventEx->head       = pEvent->head;
+  pEventEx->head = pEvent->head;
+  pEventEx->crc  = pEvent->crc;
+  pEventEx->obid = pEvent->obid;
+  if ((pEventEx->head & VSCP_HEADER16_FRAME_VERSION_MASK) == VSCP_HEADER16_FRAME_VERSION_UNIX_NS) {
+    pEventEx->timestamp_ns = pEvent->timestamp_ns;
+    pEventEx->year         = 0xffff;
+    pEventEx->month        = 0xff;
+  }
+  else {
+    pEventEx->year      = pEvent->year;
+    pEventEx->month     = pEvent->month;
+    pEventEx->day       = pEvent->day;
+    pEventEx->hour      = pEvent->hour;
+    pEventEx->minute    = pEvent->minute;
+    pEventEx->second    = pEvent->second;
+    pEventEx->timestamp = pEvent->timestamp;
+  }
+
   pEventEx->obid       = pEvent->obid;
   pEventEx->vscp_class = pEvent->vscp_class;
   pEventEx->vscp_type  = pEvent->vscp_type;
@@ -4341,16 +4541,25 @@ vscp_convertEventExToEvent(vscpEvent *pEvent, const vscpEventEx *pEventEx)
   }
 
   // Convert
-  pEvent->crc        = pEventEx->crc;
-  pEvent->obid       = pEventEx->obid;
-  pEvent->year       = pEventEx->year;
-  pEvent->month      = pEventEx->month;
-  pEvent->day        = pEventEx->day;
-  pEvent->hour       = pEventEx->hour;
-  pEvent->minute     = pEventEx->minute;
-  pEvent->second     = pEventEx->second;
-  pEvent->timestamp  = pEventEx->timestamp;
-  pEvent->head       = pEventEx->head;
+  pEvent->head = pEventEx->head;
+  pEvent->crc  = pEventEx->crc;
+  pEvent->obid = pEventEx->obid;
+
+  if ((pEventEx->head & VSCP_HEADER16_FRAME_VERSION_MASK) == VSCP_HEADER16_FRAME_VERSION_UNIX_NS) {
+    pEvent->year         = 0xffff;
+    pEvent->month        = 0xff;
+    pEvent->timestamp_ns = pEventEx->timestamp_ns;
+  }
+  else {
+    pEvent->year      = pEventEx->year;
+    pEvent->month     = pEventEx->month;
+    pEvent->day       = pEventEx->day;
+    pEvent->hour      = pEventEx->hour;
+    pEvent->minute    = pEventEx->minute;
+    pEvent->second    = pEventEx->second;
+    pEvent->timestamp = pEventEx->timestamp;
+  }
+
   pEvent->obid       = pEventEx->obid;
   pEvent->vscp_class = pEventEx->vscp_class;
   pEvent->vscp_type  = pEventEx->vscp_type;
@@ -4380,16 +4589,27 @@ vscp_copyEvent(vscpEvent *pEventTo, const vscpEvent *pEventFrom)
   }
 
   // Convert
-  pEventTo->crc        = pEventFrom->crc;
-  pEventTo->obid       = pEventFrom->obid;
-  pEventTo->year       = pEventFrom->year;
-  pEventTo->month      = pEventFrom->month;
-  pEventTo->day        = pEventFrom->day;
-  pEventTo->hour       = pEventFrom->hour;
-  pEventTo->minute     = pEventFrom->minute;
-  pEventTo->second     = pEventFrom->second;
-  pEventTo->timestamp  = pEventFrom->timestamp;
-  pEventTo->head       = pEventFrom->head;
+  pEventTo->head  = pEventFrom->head;
+  pEventTo->crc   = pEventFrom->crc;
+  pEventTo->obid  = pEventFrom->obid;
+  pEventTo->year  = pEventFrom->year;
+  pEventTo->month = pEventFrom->month;
+  pEventTo->day   = pEventFrom->day;
+  if ((pEventFrom->head & VSCP_HEADER16_FRAME_VERSION_MASK) == VSCP_HEADER16_FRAME_VERSION_UNIX_NS) {
+    pEventTo->year         = 0xffff;
+    pEventTo->month        = 0xff;
+    pEventTo->timestamp_ns = pEventFrom->timestamp_ns;
+  }
+  else {
+    pEventTo->year      = pEventFrom->year;
+    pEventTo->month     = pEventFrom->month;
+    pEventTo->day       = pEventFrom->day;
+    pEventTo->hour      = pEventFrom->hour;
+    pEventTo->minute    = pEventFrom->minute;
+    pEventTo->second    = pEventFrom->second;
+    pEventTo->timestamp = pEventFrom->timestamp;
+  }
+
   pEventTo->obid       = pEventFrom->obid;
   pEventTo->vscp_class = pEventFrom->vscp_class;
   pEventTo->vscp_type  = pEventFrom->vscp_type;
@@ -4417,42 +4637,51 @@ vscp_copyEvent(vscpEvent *pEventTo, const vscpEvent *pEventFrom)
 // copyEventEx
 
 bool
-vscp_copyEventEx(vscpEventEx *pEventTo, const vscpEventEx *pEventFrom)
+vscp_copyEventEx(vscpEventEx *pEventExTo, const vscpEventEx *pEventExFrom)
 {
   // Check pointers
-  if (nullptr == pEventTo) {
+  if (nullptr == pEventExTo) {
     return false;
   }
 
-  if (nullptr == pEventFrom) {
+  if (nullptr == pEventExFrom) {
     return false;
   }
 
-  if (pEventFrom->sizeData > VSCP_LEVEL2_MAXDATA) {
+  if (pEventExFrom->sizeData > VSCP_LEVEL2_MAXDATA) {
     return false;
   }
 
   // Convert
-  pEventTo->crc        = pEventFrom->crc;
-  pEventTo->obid       = pEventFrom->obid;
-  pEventTo->year       = pEventFrom->year;
-  pEventTo->month      = pEventFrom->month;
-  pEventTo->day        = pEventFrom->day;
-  pEventTo->hour       = pEventFrom->hour;
-  pEventTo->minute     = pEventFrom->minute;
-  pEventTo->second     = pEventFrom->second;
-  pEventTo->timestamp  = pEventFrom->timestamp;
-  pEventTo->head       = pEventFrom->head;
-  pEventTo->obid       = pEventFrom->obid;
-  pEventTo->vscp_class = pEventFrom->vscp_class;
-  pEventTo->vscp_type  = pEventFrom->vscp_type;
-  pEventTo->sizeData   = pEventFrom->sizeData;
+  pEventExTo->head = pEventExFrom->head;
+  pEventExTo->crc  = pEventExFrom->crc;
+  pEventExTo->obid = pEventExFrom->obid;
 
-  memcpy(pEventTo->GUID, pEventFrom->GUID, 16);
-  memcpy(pEventTo->data, pEventFrom->data, pEventFrom->sizeData);
+  if ((pEventExFrom->head & VSCP_HEADER16_FRAME_VERSION_MASK) == VSCP_HEADER16_FRAME_VERSION_UNIX_NS) {
+    pEventExTo->year         = 0xffff;
+    pEventExTo->month        = 0xff;
+    pEventExTo->timestamp_ns = pEventExFrom->timestamp_ns;
+  }
+  else {
+    pEventExTo->year      = pEventExFrom->year;
+    pEventExTo->month     = pEventExFrom->month;
+    pEventExTo->day       = pEventExFrom->day;
+    pEventExTo->hour      = pEventExFrom->hour;
+    pEventExTo->minute    = pEventExFrom->minute;
+    pEventExTo->second    = pEventExFrom->second;
+    pEventExTo->timestamp = pEventExFrom->timestamp;
+  }
 
-  if (pEventFrom->sizeData) {
-    memcpy(pEventTo->data, pEventFrom->data, pEventFrom->sizeData);
+  pEventExTo->obid       = pEventExFrom->obid;
+  pEventExTo->vscp_class = pEventExFrom->vscp_class;
+  pEventExTo->vscp_type  = pEventExFrom->vscp_type;
+  pEventExTo->sizeData   = pEventExFrom->sizeData;
+
+  memcpy(pEventExTo->GUID, pEventExFrom->GUID, 16);
+  memcpy(pEventExTo->data, pEventExFrom->data, pEventExFrom->sizeData);
+
+  if (pEventExFrom->sizeData) {
+    memcpy(pEventExTo->data, pEventExFrom->data, pEventExFrom->sizeData);
   }
 
   return true;
@@ -4539,14 +4768,38 @@ vscp_getDateStringFromEvent(std::string &dt, const vscpEvent *pEvent)
   // Return empty string if all date/time values is zero
   dt.clear();
 
-  if (pEvent->year || pEvent->month || pEvent->day || pEvent->hour || pEvent->minute || pEvent->second) {
-    dt = vscp_str_format("%04d-%02d-%02dT%02d:%02d:%02dZ",
-                         (int) pEvent->year,
-                         (int) pEvent->month,
-                         (int) pEvent->day,
-                         (int) pEvent->hour,
-                         (int) pEvent->minute,
-                         (int) pEvent->second);
+  // Check frame version
+  uint16_t frameVersion = pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK;
+  
+  if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
+    // UNIX_NS frame: convert nanoseconds since epoch to ISO 8601 string
+    if (pEvent->timestamp_ns > 0) {
+      time_t secs = static_cast<time_t>(pEvent->timestamp_ns / 1000000000ULL);
+      uint32_t nanos = static_cast<uint32_t>(pEvent->timestamp_ns % 1000000000ULL);
+      struct tm *tm_info = gmtime(&secs);
+      if (tm_info != nullptr) {
+        dt = vscp_str_format("%04d-%02d-%02dT%02d:%02d:%02d.%09uZ",
+                             tm_info->tm_year + 1900,
+                             tm_info->tm_mon + 1,
+                             tm_info->tm_mday,
+                             tm_info->tm_hour,
+                             tm_info->tm_min,
+                             tm_info->tm_sec,
+                             nanos);
+      }
+    }
+  }
+  else {
+    // ORIGINAL frame: use year/month/day/hour/minute/second fields
+    if (pEvent->year || pEvent->month || pEvent->day || pEvent->hour || pEvent->minute || pEvent->second) {
+      dt = vscp_str_format("%04d-%02d-%02dT%02d:%02d:%02dZ",
+                           (int) pEvent->year,
+                           (int) pEvent->month,
+                           (int) pEvent->day,
+                           (int) pEvent->hour,
+                           (int) pEvent->minute,
+                           (int) pEvent->second);
+    }
   }
 
   return true;
@@ -4564,13 +4817,42 @@ vscp_getDateStringFromEventEx(std::string &dt, const vscpEventEx *pEventEx)
     return false;
   }
 
-  dt = vscp_str_format("%04d-%02d-%02dT%02d:%02d:%02dZ",
-                       (int) pEventEx->year,
-                       (int) pEventEx->month,
-                       (int) pEventEx->day,
-                       (int) pEventEx->hour,
-                       (int) pEventEx->minute,
-                       (int) pEventEx->second);
+  dt.clear();
+
+  // Check frame version
+  uint16_t frameVersion = pEventEx->head & VSCP_HEADER16_FRAME_VERSION_MASK;
+  
+  if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
+    // UNIX_NS frame: convert nanoseconds since epoch to ISO 8601 string
+    if (pEventEx->timestamp_ns > 0) {
+      time_t secs = static_cast<time_t>(pEventEx->timestamp_ns / 1000000000ULL);
+      uint32_t nanos = static_cast<uint32_t>(pEventEx->timestamp_ns % 1000000000ULL);
+      struct tm *tm_info = gmtime(&secs);
+      if (tm_info != nullptr) {
+        dt = vscp_str_format("%04d-%02d-%02dT%02d:%02d:%02d.%09uZ",
+                             tm_info->tm_year + 1900,
+                             tm_info->tm_mon + 1,
+                             tm_info->tm_mday,
+                             tm_info->tm_hour,
+                             tm_info->tm_min,
+                             tm_info->tm_sec,
+                             nanos);
+      }
+    }
+  }
+  else {
+    // ORIGINAL frame: use year/month/day/hour/minute/second fields
+    if (pEventEx->year || pEventEx->month || pEventEx->day || pEventEx->hour || pEventEx->minute || pEventEx->second) {
+      dt = vscp_str_format("%04d-%02d-%02dT%02d:%02d:%02dZ",
+                           (int) pEventEx->year,
+                           (int) pEventEx->month,
+                           (int) pEventEx->day,
+                           (int) pEventEx->hour,
+                           (int) pEventEx->minute,
+                           (int) pEventEx->second);
+    }
+  }
+
   return true;
 }
 
@@ -4595,17 +4877,45 @@ vscp_convertEventToJSON(std::string &strJSON, const vscpEvent *pEvent)
   std::string dt;
   vscp_getDateStringFromEvent(dt, pEvent);
 
-  // datetime,head,obid,datetime,timestamp,class,type,guid,data,note
-  strJSON = vscp_str_format(VSCP_JSON_EVENT_TEMPLATE,
-                            (unsigned short int) pEvent->head,
-                            (unsigned long) pEvent->obid,
-                            (const char *) dt.c_str(),
-                            (unsigned long) pEvent->timestamp,
-                            (unsigned short int) pEvent->vscp_class,
-                            (unsigned short int) pEvent->vscp_type,
-                            (const char *) strguid.c_str(),
-                            (const char *) strdata.c_str(),
-                            "");
+  // Check frame version for timestamp handling
+  uint16_t frameVersion = pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK;
+  
+  if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
+    // UNIX_NS frame: use 64-bit nanosecond timestamp
+    strJSON = vscp_str_format("{\n"
+                              "\"head\": %d,\n"
+                              "\"obid\": %lu,\n"
+                              "\"datetime\": \"%s\",\n"
+                              "\"timestamp\": %llu,\n"
+                              "\"class\": %d,\n"
+                              "\"type\": %d,\n"
+                              "\"guid\": \"%s\",\n"
+                              "\"data\": [%s],\n"
+                              "\"note\": \"%s\"\n"
+                              "}",
+                              (unsigned short int) pEvent->head,
+                              (unsigned long) pEvent->obid,
+                              (const char *) dt.c_str(),
+                              (unsigned long long) pEvent->timestamp_ns,
+                              (unsigned short int) pEvent->vscp_class,
+                              (unsigned short int) pEvent->vscp_type,
+                              (const char *) strguid.c_str(),
+                              (const char *) strdata.c_str(),
+                              "");
+  }
+  else {
+    // ORIGINAL frame: use 32-bit timestamp
+    strJSON = vscp_str_format(VSCP_JSON_EVENT_TEMPLATE,
+                              (unsigned short int) pEvent->head,
+                              (unsigned long) pEvent->obid,
+                              (const char *) dt.c_str(),
+                              (unsigned long) pEvent->timestamp,
+                              (unsigned short int) pEvent->vscp_class,
+                              (unsigned short int) pEvent->vscp_type,
+                              (const char *) strguid.c_str(),
+                              (const char *) strdata.c_str(),
+                              "");
+  }
 
   return true;
 }
@@ -4656,24 +4966,43 @@ vscp_convertJSONToEvent(vscpEvent *pEvent, std::string &strJSON)
       pEvent->obid = j.at("obid").get<uint32_t>();
     }
 
-    // timestamp
-    if (j.contains("timestamp") && j["timestamp"].is_number_unsigned()) {
-      pEvent->timestamp = j.at("timestamp").get<uint32_t>();
+    // timestamp - check frame version to determine if it's 32-bit or 64-bit
+    uint16_t frameVersion = pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK;
+    if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
+      // UNIX_NS frame: use 64-bit nanosecond timestamp
+      pEvent->timestamp_ns = 0;
+      if (j.contains("timestamp") && j["timestamp"].is_number_unsigned()) {
+        pEvent->timestamp_ns = j.at("timestamp").get<uint64_t>();
+      }
+      // If timestamp_ns is zero, set current time in nanoseconds
+      if (!pEvent->timestamp_ns) {
+        struct timespec ts;
+        clock_gettime(CLOCK_REALTIME, &ts);
+        pEvent->timestamp_ns = (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+      }
+      pEvent->year = 0xffff;
+      pEvent->month = 0xff;
     }
+    else {
+      // ORIGINAL frame: use 32-bit timestamp
+      pEvent->timestamp = 0;
+      if (j.contains("timestamp") && j["timestamp"].is_number_unsigned()) {
+        pEvent->timestamp = j.at("timestamp").get<uint32_t>();
+      }
+      // If timestamp is zero set a timestamp here
+      if (!pEvent->timestamp) {
+        pEvent->timestamp = vscp_makeTimeStamp();
+      }
 
-    // If timestamp is zero set a timestamp here
-    if (!pEvent->timestamp) {
-      pEvent->timestamp = vscp_makeTimeStamp();
-    }
-
-    // datetime - if not set use current time
-    vscp_setEventToNow(pEvent);
-    if (j.contains("datetime") && j["datetime"].is_string()) {
-      std::string dtStr = j.at("datetime").get<std::string>();
-      struct tm tm;
-      memset(&tm, 0, sizeof(tm));
-      if (vscp_parseISOCombined(&tm, dtStr)) {
-        vscp_setEventDateTime(pEvent, &tm);
+      // datetime - if not set use current time
+      vscp_setEventToNow(pEvent);
+      if (j.contains("datetime") && j["datetime"].is_string()) {
+        std::string dtStr = j.at("datetime").get<std::string>();
+        struct tm tm;
+        memset(&tm, 0, sizeof(tm));
+        if (vscp_parseISOCombined(&tm, dtStr)) {
+          vscp_setEventDateTime(pEvent, &tm);
+        }
       }
     }
 
@@ -4754,17 +5083,45 @@ vscp_convertEventExToJSON(std::string &strJSON, const vscpEventEx *pEventEx)
   std::string dt;
   vscp_getDateStringFromEventEx(dt, pEventEx);
 
-  // datetime,head,obid,datetime,timestamp,class,type,guid,data,note
-  strJSON = vscp_str_format(VSCP_JSON_EVENT_TEMPLATE,
-                            (unsigned short int) pEventEx->head,
-                            (unsigned long) pEventEx->obid,
-                            (const char *) dt.c_str(),
-                            (unsigned long) pEventEx->timestamp,
-                            (unsigned short int) pEventEx->vscp_class,
-                            (unsigned short int) pEventEx->vscp_type,
-                            (const char *) strguid.c_str(),
-                            (const char *) strdata.c_str(),
-                            "");
+  // Check frame version for timestamp handling
+  uint16_t frameVersion = pEventEx->head & VSCP_HEADER16_FRAME_VERSION_MASK;
+  
+  if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
+    // UNIX_NS frame: use 64-bit nanosecond timestamp
+    strJSON = vscp_str_format("{\n"
+                              "\"head\": %d,\n"
+                              "\"obid\": %lu,\n"
+                              "\"datetime\": \"%s\",\n"
+                              "\"timestamp\": %llu,\n"
+                              "\"class\": %d,\n"
+                              "\"type\": %d,\n"
+                              "\"guid\": \"%s\",\n"
+                              "\"data\": [%s],\n"
+                              "\"note\": \"%s\"\n"
+                              "}",
+                              (unsigned short int) pEventEx->head,
+                              (unsigned long) pEventEx->obid,
+                              (const char *) dt.c_str(),
+                              (unsigned long long) pEventEx->timestamp_ns,
+                              (unsigned short int) pEventEx->vscp_class,
+                              (unsigned short int) pEventEx->vscp_type,
+                              (const char *) strguid.c_str(),
+                              (const char *) strdata.c_str(),
+                              "");
+  }
+  else {
+    // ORIGINAL frame: use 32-bit timestamp
+    strJSON = vscp_str_format(VSCP_JSON_EVENT_TEMPLATE,
+                              (unsigned short int) pEventEx->head,
+                              (unsigned long) pEventEx->obid,
+                              (const char *) dt.c_str(),
+                              (unsigned long) pEventEx->timestamp,
+                              (unsigned short int) pEventEx->vscp_class,
+                              (unsigned short int) pEventEx->vscp_type,
+                              (const char *) strguid.c_str(),
+                              (const char *) strdata.c_str(),
+                              "");
+  }
 
   return true;
 }
@@ -4812,25 +5169,43 @@ vscp_convertJSONToEventEx(vscpEventEx *pEventEx, std::string &strJSON)
       pEventEx->obid = j.at("obid").get<uint32_t>();
     }
 
-    // TimeStamp
-    pEventEx->timestamp = 0;
-    if (j.contains("timestamp") && j["timestamp"].is_number_unsigned()) {
-      pEventEx->timestamp = j.at("timestamp").get<uint32_t>();
+    // timestamp - check frame version to determine if it's 32-bit or 64-bit
+    uint16_t frameVersion = pEventEx->head & VSCP_HEADER16_FRAME_VERSION_MASK;
+    if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
+      // UNIX_NS frame: use 64-bit nanosecond timestamp
+      pEventEx->timestamp_ns = 0;
+      if (j.contains("timestamp") && j["timestamp"].is_number_unsigned()) {
+        pEventEx->timestamp_ns = j.at("timestamp").get<uint64_t>();
+      }
+      // If timestamp_ns is zero, set current time in nanoseconds
+      if (!pEventEx->timestamp_ns) {
+        struct timespec ts;
+        clock_gettime(CLOCK_REALTIME, &ts);
+        pEventEx->timestamp_ns = (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+      }
+      pEventEx->year = 0xffff;
+      pEventEx->month = 0xff;
     }
+    else {
+      // ORIGINAL frame: use 32-bit timestamp
+      pEventEx->timestamp = 0;
+      if (j.contains("timestamp") && j["timestamp"].is_number_unsigned()) {
+        pEventEx->timestamp = j.at("timestamp").get<uint32_t>();
+      }
+      // If timestamp is zero set a timestamp here
+      if (!pEventEx->timestamp) {
+        pEventEx->timestamp = vscp_makeTimeStamp();
+      }
 
-    // If timestamp is zero set a timestamp here
-    if (!pEventEx->timestamp) {
-      pEventEx->timestamp = vscp_makeTimeStamp();
-    }
-
-    // DateTime
-    vscp_setEventExToNow(pEventEx);
-    if (j.contains("datetime") && j["datetime"].is_string()) {
-      std::string dtStr = j.at("datetime").get<std::string>();
-      struct tm tm;
-      memset(&tm, 0, sizeof(tm));
-      vscp_parseISOCombined(&tm, dtStr);
-      vscp_setEventExDateTime(pEventEx, &tm);
+      // DateTime
+      vscp_setEventExToNow(pEventEx);
+      if (j.contains("datetime") && j["datetime"].is_string()) {
+        std::string dtStr = j.at("datetime").get<std::string>();
+        struct tm tm;
+        memset(&tm, 0, sizeof(tm));
+        vscp_parseISOCombined(&tm, dtStr);
+        vscp_setEventExDateTime(pEventEx, &tm);
+      }
     }
 
     // VSCP class
@@ -4905,16 +5280,42 @@ vscp_convertEventToXML(std::string &strXML, vscpEvent *pEvent)
   std::string dt;
   vscp_getDateStringFromEvent(dt, pEvent);
 
-  // datetime,head,obid,datetime,timestamp,class,type,guid,sizedata,data,note
-  strXML = vscp_str_format(VSCP_XML_EVENT_TEMPLATE,
-                           (unsigned short int) pEvent->head,
-                           (unsigned long) pEvent->obid,
-                           (const char *) dt.c_str(),
-                           (unsigned long) pEvent->timestamp,
-                           (unsigned short int) pEvent->vscp_class,
-                           (unsigned short int) pEvent->vscp_type,
-                           (const char *) strguid.c_str(),
-                           (const char *) strdata.c_str());
+  // Check frame version for timestamp handling
+  uint16_t frameVersion = pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK;
+  
+  if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
+    // UNIX_NS frame: use 64-bit nanosecond timestamp
+    strXML = vscp_str_format("<event "
+                             "head=\"%d\" "
+                             "obid=\"%lu\" "
+                             "datetime=\"%s\" "
+                             "timestamp=\"%llu\" "
+                             "class=\"%d\" "
+                             "type=\"%d\" "
+                             "guid=\"%s\" "
+                             "data=\"%s\" "
+                             "/>",
+                             (unsigned short int) pEvent->head,
+                             (unsigned long) pEvent->obid,
+                             (const char *) dt.c_str(),
+                             (unsigned long long) pEvent->timestamp_ns,
+                             (unsigned short int) pEvent->vscp_class,
+                             (unsigned short int) pEvent->vscp_type,
+                             (const char *) strguid.c_str(),
+                             (const char *) strdata.c_str());
+  }
+  else {
+    // ORIGINAL frame: use 32-bit timestamp
+    strXML = vscp_str_format(VSCP_XML_EVENT_TEMPLATE,
+                             (unsigned short int) pEvent->head,
+                             (unsigned long) pEvent->obid,
+                             (const char *) dt.c_str(),
+                             (unsigned long) pEvent->timestamp,
+                             (unsigned short int) pEvent->vscp_class,
+                             (unsigned short int) pEvent->vscp_type,
+                             (const char *) strguid.c_str(),
+                             (const char *) strdata.c_str());
+  }
 
   return true;
 }
@@ -4952,6 +5353,10 @@ startEventXMLParser(void *data, const char *name, const char **attr)
 
   if ((0 == strcmp(name, "event")) && (0 == depth_event_parser)) {
 
+    // Store timestamp string for later processing (need to know frame version first)
+    std::string timestampStr;
+    bool hasTimestamp = false;
+
     for (int i = 0; attr[i]; i += 2) {
 
       std::string attribute = attr[i + 1];
@@ -4970,7 +5375,9 @@ startEventXMLParser(void *data, const char *name, const char **attr)
         }
       }
       else if (0 == strcmp(attr[i], "timestamp")) {
-        pev->timestamp = vscp_readStringValue(attribute);
+        // Store for later - need to know frame version from head first
+        timestampStr = attribute;
+        hasTimestamp = true;
       }
       else if (0 == strcmp(attr[i], "class")) {
         pev->vscp_class = vscp_readStringValue(attribute);
@@ -4985,6 +5392,21 @@ startEventXMLParser(void *data, const char *name, const char **attr)
       else if (0 == strcmp(attr[i], "data")) {
         std::string str = attribute;
         vscp_setEventDataFromString(pev, str);
+      }
+    }
+
+    // Process timestamp based on frame version
+    if (hasTimestamp) {
+      uint16_t frameVersion = pev->head & VSCP_HEADER16_FRAME_VERSION_MASK;
+      if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
+        // UNIX_NS frame: parse as 64-bit nanosecond timestamp
+        pev->timestamp_ns = std::stoull(timestampStr);
+        pev->year = 0xffff;
+        pev->month = 0xff;
+      }
+      else {
+        // ORIGINAL frame: parse as 32-bit timestamp
+        pev->timestamp = vscp_readStringValue(timestampStr);
       }
     }
   }
@@ -5052,16 +5474,42 @@ vscp_convertEventExToXML(std::string &strXML, vscpEventEx *pEventEx)
   std::string dt;
   vscp_getDateStringFromEventEx(dt, pEventEx);
 
-  // datetime,head,obid,datetime,timestamp,class,type,guid,sizedata,data,note
-  strXML = vscp_str_format(VSCP_XML_EVENT_TEMPLATE,
-                           (unsigned short int) pEventEx->head,
-                           (unsigned long) pEventEx->obid,
-                           (const char *) dt.c_str(),
-                           (unsigned long) pEventEx->timestamp,
-                           (unsigned short int) pEventEx->vscp_class,
-                           (unsigned short int) pEventEx->vscp_type,
-                           (const char *) strguid.c_str(),
-                           (const char *) strdata.c_str());
+  // Check frame version for timestamp handling
+  uint16_t frameVersion = pEventEx->head & VSCP_HEADER16_FRAME_VERSION_MASK;
+  
+  if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
+    // UNIX_NS frame: use 64-bit nanosecond timestamp
+    strXML = vscp_str_format("<event "
+                             "head=\"%d\" "
+                             "obid=\"%lu\" "
+                             "datetime=\"%s\" "
+                             "timestamp=\"%llu\" "
+                             "class=\"%d\" "
+                             "type=\"%d\" "
+                             "guid=\"%s\" "
+                             "data=\"%s\" "
+                             "/>",
+                             (unsigned short int) pEventEx->head,
+                             (unsigned long) pEventEx->obid,
+                             (const char *) dt.c_str(),
+                             (unsigned long long) pEventEx->timestamp_ns,
+                             (unsigned short int) pEventEx->vscp_class,
+                             (unsigned short int) pEventEx->vscp_type,
+                             (const char *) strguid.c_str(),
+                             (const char *) strdata.c_str());
+  }
+  else {
+    // ORIGINAL frame: use 32-bit timestamp
+    strXML = vscp_str_format(VSCP_XML_EVENT_TEMPLATE,
+                             (unsigned short int) pEventEx->head,
+                             (unsigned long) pEventEx->obid,
+                             (const char *) dt.c_str(),
+                             (unsigned long) pEventEx->timestamp,
+                             (unsigned short int) pEventEx->vscp_class,
+                             (unsigned short int) pEventEx->vscp_type,
+                             (const char *) strguid.c_str(),
+                             (const char *) strdata.c_str());
+  }
 
   return true;
 }
@@ -5093,11 +5541,15 @@ startEventExXMLParser(void *data, const char *name, const char **attr)
   }
 
   // Init event with defaults
-  memset(pex, 0, sizeof(vscpEvent));
+  memset(pex, 0, sizeof(vscpEventEx));
   vscp_setEventExToNow(pex);
   pex->timestamp = vscp_makeTimeStamp();
 
   if ((0 == strcmp(name, "event")) && (0 == depth_eventex_parser)) {
+
+    // Store timestamp string for later processing (need to know frame version first)
+    std::string timestampStr;
+    bool hasTimestamp = false;
 
     for (int i = 0; attr[i]; i += 2) {
 
@@ -5117,7 +5569,9 @@ startEventExXMLParser(void *data, const char *name, const char **attr)
         }
       }
       else if (0 == strcmp(attr[i], "timestamp")) {
-        pex->timestamp = vscp_readStringValue(attribute);
+        // Store for later - need to know frame version from head first
+        timestampStr = attribute;
+        hasTimestamp = true;
       }
       else if (0 == strcmp(attr[i], "class")) {
         pex->vscp_class = vscp_readStringValue(attribute);
@@ -5132,6 +5586,21 @@ startEventExXMLParser(void *data, const char *name, const char **attr)
       else if (0 == strcmp(attr[i], "data")) {
         std::string str = attribute;
         vscp_setEventExDataFromString(pex, str);
+      }
+    }
+
+    // Process timestamp based on frame version
+    if (hasTimestamp) {
+      uint16_t frameVersion = pex->head & VSCP_HEADER16_FRAME_VERSION_MASK;
+      if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
+        // UNIX_NS frame: parse as 64-bit nanosecond timestamp
+        pex->timestamp_ns = std::stoull(timestampStr);
+        pex->year = 0xffff;
+        pex->month = 0xff;
+      }
+      else {
+        // ORIGINAL frame: parse as 32-bit timestamp
+        pex->timestamp = vscp_readStringValue(timestampStr);
       }
     }
   }
@@ -5199,18 +5668,57 @@ vscp_convertEventToHTML(std::string &strHTML, vscpEvent *pEvent)
   std::string dt;
   vscp_getDateStringFromEvent(dt, pEvent);
 
-  // datetime,class,type,data-count,data,guid,head,timestamp,obid,note
-  strHTML = vscp_str_format(VSCP_HTML_EVENT_TEMPLATE,
-                            (unsigned short int) pEvent->vscp_class,
-                            (unsigned short int) pEvent->vscp_type,
-                            (unsigned short int) pEvent->sizeData,
-                            (const char *) strdata.c_str(),
-                            (const char *) strguid.c_str(),
-                            (unsigned short int) pEvent->head,
-                            (const char *) dt.c_str(),
-                            (unsigned long) pEvent->timestamp,
-                            (unsigned long) pEvent->obid,
-                            "");
+  // Check frame version for timestamp handling
+  uint16_t frameVersion = pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK;
+  
+  if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
+    // UNIX_NS frame: use 64-bit nanosecond timestamp
+    strHTML = vscp_str_format("<h2>VSCP Event</h2> "
+                              "<p>"
+                              "class: %d <br>"
+                              "type: %d <br>"
+                              "</p>"
+                              "<p>"
+                              "data size: %d<br>"
+                              "data: %s<br>"
+                              "</p>"
+                              "<p>"
+                              "guid: %s<br>"
+                              "</p>"
+                              "<p>"
+                              "head: %d <br>"
+                              "<p>"
+                              "datetime: %s <br>"
+                              "</p>"
+                              "timestamp: %llu <br>"
+                              "obid: %lu <br>"
+                              "note: %s <br>"
+                              "</p>",
+                              (unsigned short int) pEvent->vscp_class,
+                              (unsigned short int) pEvent->vscp_type,
+                              (unsigned short int) pEvent->sizeData,
+                              (const char *) strdata.c_str(),
+                              (const char *) strguid.c_str(),
+                              (unsigned short int) pEvent->head,
+                              (const char *) dt.c_str(),
+                              (unsigned long long) pEvent->timestamp_ns,
+                              (unsigned long) pEvent->obid,
+                              "");
+  }
+  else {
+    // ORIGINAL frame: use 32-bit timestamp
+    strHTML = vscp_str_format(VSCP_HTML_EVENT_TEMPLATE,
+                              (unsigned short int) pEvent->vscp_class,
+                              (unsigned short int) pEvent->vscp_type,
+                              (unsigned short int) pEvent->sizeData,
+                              (const char *) strdata.c_str(),
+                              (const char *) strguid.c_str(),
+                              (unsigned short int) pEvent->head,
+                              (const char *) dt.c_str(),
+                              (unsigned long) pEvent->timestamp,
+                              (unsigned long) pEvent->obid,
+                              "");
+  }
 
   return true;
 }
@@ -5237,18 +5745,57 @@ vscp_convertEventExToHTML(std::string &strHTML, vscpEventEx *pEventEx)
   std::string dt;
   vscp_getDateStringFromEventEx(dt, pEventEx);
 
-  // datetime,class,type,data-count,data,guid,head,timestamp,obid,note
-  strHTML = vscp_str_format(VSCP_HTML_EVENT_TEMPLATE,
-                            (unsigned short int) pEventEx->vscp_class,
-                            (unsigned short int) pEventEx->vscp_type,
-                            (unsigned short int) pEventEx->sizeData,
-                            (const char *) strdata.c_str(),
-                            (const char *) strguid.c_str(),
-                            (unsigned short int) pEventEx->head,
-                            (const char *) dt.c_str(),
-                            (unsigned long) pEventEx->timestamp,
-                            (unsigned long) pEventEx->obid,
-                            "");
+  // Check frame version for timestamp handling
+  uint16_t frameVersion = pEventEx->head & VSCP_HEADER16_FRAME_VERSION_MASK;
+  
+  if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
+    // UNIX_NS frame: use 64-bit nanosecond timestamp
+    strHTML = vscp_str_format("<h2>VSCP Event</h2> "
+                              "<p>"
+                              "class: %d <br>"
+                              "type: %d <br>"
+                              "</p>"
+                              "<p>"
+                              "data size: %d<br>"
+                              "data: %s<br>"
+                              "</p>"
+                              "<p>"
+                              "guid: %s<br>"
+                              "</p>"
+                              "<p>"
+                              "head: %d <br>"
+                              "<p>"
+                              "datetime: %s <br>"
+                              "</p>"
+                              "timestamp: %llu <br>"
+                              "obid: %lu <br>"
+                              "note: %s <br>"
+                              "</p>",
+                              (unsigned short int) pEventEx->vscp_class,
+                              (unsigned short int) pEventEx->vscp_type,
+                              (unsigned short int) pEventEx->sizeData,
+                              (const char *) strdata.c_str(),
+                              (const char *) strguid.c_str(),
+                              (unsigned short int) pEventEx->head,
+                              (const char *) dt.c_str(),
+                              (unsigned long long) pEventEx->timestamp_ns,
+                              (unsigned long) pEventEx->obid,
+                              "");
+  }
+  else {
+    // ORIGINAL frame: use 32-bit timestamp
+    strHTML = vscp_str_format(VSCP_HTML_EVENT_TEMPLATE,
+                              (unsigned short int) pEventEx->vscp_class,
+                              (unsigned short int) pEventEx->vscp_type,
+                              (unsigned short int) pEventEx->sizeData,
+                              (const char *) strdata.c_str(),
+                              (const char *) strguid.c_str(),
+                              (unsigned short int) pEventEx->head,
+                              (const char *) dt.c_str(),
+                              (unsigned long) pEventEx->timestamp,
+                              (unsigned long) pEventEx->obid,
+                              "");
+  }
 
   return true;
 }
@@ -5342,24 +5889,45 @@ vscp_set_eventex_info_from_topic(vscpEventEx *pex, const char *topic)
   return 0;
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // vscp_setEventDateTime
 //
 
 bool
-vscp_setEventDateTime(vscpEvent *pEvent, struct tm *ptm)
+vscp_setEventDateTime(vscpEvent *pEvent, struct tm *ptm, uint32_t ns)
 {
   if (nullptr == pEvent) {
     return false;
   }
 
-  pEvent->year   = ptm->tm_year + 1900;
-  pEvent->month  = ptm->tm_mon + 1;
-  pEvent->day    = ptm->tm_mday;
-  pEvent->hour   = ptm->tm_hour;
-  pEvent->minute = ptm->tm_min;
-  pEvent->second = ptm->tm_sec;
+  if (nullptr == ptm) {
+    return false;
+  }
+
+  // Clamp nanoseconds to valid range (0-999999999)
+  if (ns > 999999999) {
+    ns = 999999999;
+  }
+
+  // Check frame version
+  uint16_t frameVersion = pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK;
+  
+  if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
+    // UNIX_NS frame: convert struct tm to nanoseconds since epoch + subsecond ns
+    time_t t = timegm(ptm);
+    pEvent->timestamp_ns = (uint64_t)t * 1000000000ULL + ns;
+    pEvent->year = 0xffff;
+    pEvent->month = 0xff;
+  }
+  else {
+    // ORIGINAL frame: set individual date/time fields (no subsecond precision)
+    pEvent->year   = ptm->tm_year + 1900;
+    pEvent->month  = ptm->tm_mon + 1;
+    pEvent->day    = ptm->tm_mday;
+    pEvent->hour   = ptm->tm_hour;
+    pEvent->minute = ptm->tm_min;
+    pEvent->second = ptm->tm_sec;
+  }
 
   return true;
 }
@@ -5369,18 +5937,40 @@ vscp_setEventDateTime(vscpEvent *pEvent, struct tm *ptm)
 //
 
 bool
-vscp_setEventExDateTime(vscpEventEx *pEventEx, struct tm *ptm)
+vscp_setEventExDateTime(vscpEventEx *pEventEx, struct tm *ptm, uint32_t ns)
 {
   if (nullptr == pEventEx) {
     return false;
   }
 
-  pEventEx->year   = ptm->tm_year + 1900;
-  pEventEx->month  = ptm->tm_mon + 1;
-  pEventEx->day    = ptm->tm_mday;
-  pEventEx->hour   = ptm->tm_hour;
-  pEventEx->minute = ptm->tm_min;
-  pEventEx->second = ptm->tm_sec;
+  if (nullptr == ptm) {
+    return false;
+  }
+
+  // Clamp nanoseconds to valid range (0-999999999)
+  if (ns > 999999999) {
+    ns = 999999999;
+  }
+
+  // Check frame version
+  uint16_t frameVersion = pEventEx->head & VSCP_HEADER16_FRAME_VERSION_MASK;
+  
+  if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
+    // UNIX_NS frame: convert struct tm to nanoseconds since epoch + subsecond ns
+    time_t t = timegm(ptm);
+    pEventEx->timestamp_ns = (uint64_t)t * 1000000000ULL + ns;
+    pEventEx->year = 0xffff;
+    pEventEx->month = 0xff;
+  }
+  else {
+    // ORIGINAL frame: set individual date/time fields (no subsecond precision)
+    pEventEx->year   = ptm->tm_year + 1900;
+    pEventEx->month  = ptm->tm_mon + 1;
+    pEventEx->day    = ptm->tm_mday;
+    pEventEx->hour   = ptm->tm_hour;
+    pEventEx->minute = ptm->tm_min;
+    pEventEx->second = ptm->tm_sec;
+  }
 
   return true;
 }
@@ -5407,12 +5997,24 @@ vscp_setEventToNow(vscpEvent *pEvent)
   ptm = gmtime_r(&rawtime, &tbuf);
 #endif
 
-  pEvent->year   = ptm->tm_year + 1900;
-  pEvent->month  = ptm->tm_mon + 1;
-  pEvent->day    = ptm->tm_mday;
-  pEvent->hour   = ptm->tm_hour;
-  pEvent->minute = ptm->tm_min;
-  pEvent->second = ptm->tm_sec;
+  // Check frame version
+  uint16_t frameVersion = pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK;
+  
+  if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
+    // UNIX_NS frame: set timestamp_ns (second precision only)
+    pEvent->timestamp_ns = (uint64_t)rawtime * 1000000000ULL;
+    pEvent->year = 0xffff;
+    pEvent->month = 0xff;
+  }
+  else {
+    // ORIGINAL frame: set individual date/time fields
+    pEvent->year   = ptm->tm_year + 1900;
+    pEvent->month  = ptm->tm_mon + 1;
+    pEvent->day    = ptm->tm_mday;
+    pEvent->hour   = ptm->tm_hour;
+    pEvent->minute = ptm->tm_min;
+    pEvent->second = ptm->tm_sec;
+  }
 
   return true;
 }
@@ -5439,12 +6041,24 @@ vscp_setEventExToNow(vscpEventEx *pEventEx)
   ptm = gmtime_r(&rawtime, &tbuf);
 #endif
 
-  pEventEx->year   = ptm->tm_year + 1900;
-  pEventEx->month  = ptm->tm_mon + 1;
-  pEventEx->day    = ptm->tm_mday;
-  pEventEx->hour   = ptm->tm_hour;
-  pEventEx->minute = ptm->tm_min;
-  pEventEx->second = ptm->tm_sec;
+  // Check frame version
+  uint16_t frameVersion = pEventEx->head & VSCP_HEADER16_FRAME_VERSION_MASK;
+  
+  if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
+    // UNIX_NS frame: set timestamp_ns (second precision only)
+    pEventEx->timestamp_ns = (uint64_t)rawtime * 1000000000ULL;
+    pEventEx->year = 0xffff;
+    pEventEx->month = 0xff;
+  }
+  else {
+    // ORIGINAL frame: set individual date/time fields
+    pEventEx->year   = ptm->tm_year + 1900;
+    pEventEx->month  = ptm->tm_mon + 1;
+    pEventEx->day    = ptm->tm_mday;
+    pEventEx->hour   = ptm->tm_hour;
+    pEventEx->minute = ptm->tm_min;
+    pEventEx->second = ptm->tm_sec;
+  }
 
   return true;
 }
@@ -6136,6 +6750,7 @@ vscp_convertCanalToEvent(vscpEvent *pvscpEvent, const canalMsg *pcanalMsg, unsig
   if (pcanalMsg->id & 0x02000000) {
     pvscpEvent->head |= VSCP_HEADER_HARD_CODED;
   }
+  pvscpEvent->head |= VSCP_HEADER16_FRAME_VERSION_UNIX_NS;  // Set frame type 2 (UNIX_NS)
   pvscpEvent->vscp_class = vscp_getVscpClassFromCANALid(pcanalMsg->id);
   pvscpEvent->vscp_type  = vscp_getVscpTypeFromCANALid(pcanalMsg->id);
 
@@ -6153,7 +6768,7 @@ vscp_convertCanalToEvent(vscpEvent *pvscpEvent, const canalMsg *pcanalMsg, unsig
 }
 
 //////////////////////////////////////////////////////////////////////////////
-// convertCanalToEvent
+// convertCanalToEventEx
 //
 
 bool
@@ -6535,6 +7150,27 @@ vscp_getMsTimeStamp(void)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// vscp_makeTimeStampNs
+//
+// Return nanosecond timestamp since Unix epoch
+//
+
+uint64_t
+vscp_makeTimeStampNs(void)
+{
+#ifdef WIN32
+  // Windows: Use high-resolution timer
+  auto now = std::chrono::system_clock::now();
+  auto duration = now.time_since_epoch();
+  return (uint64_t)std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
+#else
+  struct timespec spec;
+  clock_gettime(CLOCK_REALTIME, &spec);
+  return (uint64_t)spec.tv_sec * 1000000000ULL + (uint64_t)spec.tv_nsec;
+#endif
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // vscp_setEventDateTimeBlockToNow
 //
 
@@ -6546,23 +7182,35 @@ vscp_setEventDateTimeBlockToNow(vscpEvent *pEvent)
     return false;
   }
 
-  time_t rawtime;
-  struct tm *ptm;
+  // Check frame version
+  uint16_t frameVersion = pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK;
+  
+  if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
+    // UNIX_NS frame: set timestamp_ns to current time
+    pEvent->timestamp_ns = vscp_makeTimeStampNs();
+    pEvent->year = 0xffff;
+    pEvent->month = 0xff;
+  }
+  else {
+    // ORIGINAL frame: set individual date/time fields
+    time_t rawtime;
+    struct tm *ptm;
 
-  time(&rawtime);
+    time(&rawtime);
 #ifdef WIN32
-  ptm = gmtime(&rawtime);
+    ptm = gmtime(&rawtime);
 #else
-  struct tm tbuf;
-  ptm = gmtime_r(&rawtime, &tbuf);
+    struct tm tbuf;
+    ptm = gmtime_r(&rawtime, &tbuf);
 #endif
 
-  pEvent->year   = ptm->tm_year + 1900;
-  pEvent->month  = ptm->tm_mon + 1;
-  pEvent->day    = ptm->tm_mday;
-  pEvent->hour   = ptm->tm_hour;
-  pEvent->minute = ptm->tm_min;
-  pEvent->second = ptm->tm_sec;
+    pEvent->year   = ptm->tm_year + 1900;
+    pEvent->month  = ptm->tm_mon + 1;
+    pEvent->day    = ptm->tm_mday;
+    pEvent->hour   = ptm->tm_hour;
+    pEvent->minute = ptm->tm_min;
+    pEvent->second = ptm->tm_sec;
+  }
 
   return true;
 }
@@ -6579,23 +7227,35 @@ vscp_setEventExDateTimeBlockToNow(vscpEventEx *pEventEx)
     return false;
   }
 
-  time_t rawtime;
-  struct tm *ptm;
+  // Check frame version
+  uint16_t frameVersion = pEventEx->head & VSCP_HEADER16_FRAME_VERSION_MASK;
+  
+  if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
+    // UNIX_NS frame: set timestamp_ns to current time
+    pEventEx->timestamp_ns = vscp_makeTimeStampNs();
+    pEventEx->year = 0xffff;
+    pEventEx->month = 0xff;
+  }
+  else {
+    // ORIGINAL frame: set individual date/time fields
+    time_t rawtime;
+    struct tm *ptm;
 
-  time(&rawtime);
+    time(&rawtime);
 #ifdef WIN32
-  ptm = gmtime(&rawtime);
+    ptm = gmtime(&rawtime);
 #else
-  struct tm tbuf;
-  ptm = gmtime_r(&rawtime, &tbuf);
+    struct tm tbuf;
+    ptm = gmtime_r(&rawtime, &tbuf);
 #endif
 
-  pEventEx->year   = ptm->tm_year + 1900;
-  pEventEx->month  = ptm->tm_mon + 1;
-  pEventEx->day    = ptm->tm_mday;
-  pEventEx->hour   = ptm->tm_hour;
-  pEventEx->minute = ptm->tm_min;
-  pEventEx->second = ptm->tm_sec;
+    pEventEx->year   = ptm->tm_year + 1900;
+    pEventEx->month  = ptm->tm_mon + 1;
+    pEventEx->day    = ptm->tm_mday;
+    pEventEx->hour   = ptm->tm_hour;
+    pEventEx->minute = ptm->tm_min;
+    pEventEx->second = ptm->tm_sec;
+  }
 
   return true;
 }
@@ -6617,14 +7277,28 @@ vscp_convertEventToString(std::string &str, const vscpEvent *pEvent)
   std::string dt;
   vscp_getDateStringFromEvent(dt, pEvent);
 
-  // head,class,type,obid,datetime,timestamp
-  str = vscp_str_format("%hu,%hu,%hu,%lu,%s,%lu,",
-                        (unsigned short) pEvent->head,
-                        (unsigned short) pEvent->vscp_class,
-                        (unsigned short) pEvent->vscp_type,
-                        (unsigned long) pEvent->obid,
-                        (const char *) dt.c_str(),
-                        (unsigned long) pEvent->timestamp);
+  // Check frame version for timestamp handling
+  uint16_t frameVersion = pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK;
+  
+  if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
+    // UNIX_NS frame: use 64-bit nanosecond timestamp
+    str = vscp_str_format("%hu,%hu,%hu,%lu,%llu,",
+                          (unsigned short) pEvent->head,
+                          (unsigned short) pEvent->vscp_class,
+                          (unsigned short) pEvent->vscp_type,
+                          (unsigned long) pEvent->obid,
+                          (unsigned long long) pEvent->timestamp_ns);
+  }
+  else {
+    // ORIGINAL frame: use 32-bit timestamp
+    str = vscp_str_format("%hu,%hu,%hu,%lu,%s,%lu,",
+                          (unsigned short) pEvent->head,
+                          (unsigned short) pEvent->vscp_class,
+                          (unsigned short) pEvent->vscp_type,
+                          (unsigned long) pEvent->obid,
+                          (const char *) dt.c_str(),
+                          (unsigned long) pEvent->timestamp);
+  }
 
   std::string strGUID;
   vscp_writeGuidToString(strGUID, pEvent);
@@ -6696,6 +7370,10 @@ vscp_getEventExAsString(const vscpEventEx *pEventEx)
 // Format:
 //      head,class,type,obid,datetime,timestamp,GUID,data1,data2,data3....
 //
+// Always converts to UNIX_NS frame format with nanosecond precision.
+// If datetime is empty, the timestamp field is treated as nanoseconds since epoch.
+// If datetime is present, it is converted to nanoseconds.
+//
 
 bool
 vscp_convertStringToEvent(vscpEvent *pEvent, const std::string &strEvent)
@@ -6719,6 +7397,9 @@ vscp_convertStringToEvent(vscpEvent *pEvent, const std::string &strEvent)
   else {
     return false;
   }
+
+  // Always set UNIX_NS frame version (clear old frame version bits, set UNIX_NS)
+  pEvent->head = (pEvent->head & ~VSCP_HEADER16_FRAME_VERSION_MASK) | VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
 
   // Get Class
   if (!tokens.empty()) {
@@ -6751,40 +7432,56 @@ vscp_convertStringToEvent(vscpEvent *pEvent, const std::string &strEvent)
   }
 
   // Get datetime
+  std::string strDatetime;
+  if (!tokens.empty()) {
+    strDatetime = tokens.front();
+    tokens.pop_front();
+    vscp_trim(strDatetime);
+  }
+
+  // Get Timestamp
+  uint64_t timestampValue = 0;
   if (!tokens.empty()) {
     str = tokens.front();
     tokens.pop_front();
     vscp_trim(str);
     if (str.length()) {
-      // Parse and set time
-      struct tm tm;
-      memset(&tm, 0, sizeof(tm));
-      vscp_parseISOCombined(&tm, str);
-      pEvent->year   = tm.tm_year + 1900;
-      pEvent->month  = tm.tm_mon;
-      pEvent->day    = tm.tm_mday;
-      pEvent->hour   = tm.tm_hour;
-      pEvent->minute = tm.tm_min;
-      pEvent->second = tm.tm_sec;
-    }
-    else {
-      // Set to now
-      vscp_setEventDateTimeBlockToNow(pEvent);
-    }
-  }
-
-  // Get Timestamp
-  if (!tokens.empty()) {
-    str = tokens.front();
-    tokens.pop_front();
-    pEvent->timestamp = vscp_readStringValue(str);
-    if (!pEvent->timestamp) {
-      pEvent->timestamp = vscp_makeTimeStamp();
+      timestampValue = strtoull(str.c_str(), nullptr, 0);
     }
   }
   else {
     return false;
   }
+
+  // Process datetime and timestamp for UNIX_NS frame
+  if (strDatetime.length()) {
+    // Datetime present: parse it and convert to nanoseconds
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+    vscp_parseISOCombined(&tm, strDatetime);
+    time_t t = timegm(&tm);
+    pEvent->timestamp_ns = (uint64_t)t * 1000000000ULL;
+    // If timestamp field has a value, it may contain subsecond info
+    // (microseconds from old format) - add it as nanoseconds
+    if (timestampValue > 0 && timestampValue < 1000000000ULL) {
+      // Looks like microseconds or less - treat as microseconds
+      pEvent->timestamp_ns += timestampValue * 1000ULL;
+    }
+  }
+  else {
+    // No datetime: timestamp field is the nanosecond timestamp
+    if (timestampValue > 0) {
+      pEvent->timestamp_ns = timestampValue;
+    }
+    else {
+      // Generate current timestamp
+      pEvent->timestamp_ns = vscp_makeTimeStampNs();
+    }
+  }
+  
+  // Set UNIX_NS markers
+  pEvent->year = 0xffff;
+  pEvent->month = 0xff;
 
   // Get GUID
   std::string strGUID;
@@ -6989,6 +7686,8 @@ vscp_getFrameSizeFromEventEx(vscpEventEx *pEventEx)
 ////////////////////////////////////////////////////////////////////////////////
 // vscp_writeEventToFrame
 //
+// Uses packet format 0 for original frame version and packet format 1 for UNIX_NS frame version.
+//
 
 bool
 vscp_writeEventToFrame(uint8_t *frame, size_t len, uint8_t pkttype, const vscpEvent *pEvent)
@@ -7007,61 +7706,125 @@ vscp_writeEventToFrame(uint8_t *frame, size_t len, uint8_t pkttype, const vscpEv
     return false;
   }
 
-  size_t calcSize = 1 +                                                          // Packet type
-                    VSCP_MULTICAST_PACKET0_HEADER_LENGTH + pEvent->sizeData + 2; // CRC
+  // Check frame version
+  uint16_t frameVersion = pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK;
 
-  if (len < calcSize) {
-    return false;
+  if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
+    // Packet format 1 - UNIX_NS nanosecond timestamp
+    size_t calcSize = 1 +                                                          // Packet type
+                      VSCP_MULTICAST_PACKET1_HEADER_LENGTH + pEvent->sizeData + 2; // CRC
+
+    if (len < calcSize) {
+      return false;
+    }
+
+    // Frame type - set packet type 1 in upper nibble
+    frame[VSCP_MULTICAST_PACKET1_POS_PKTTYPE] = (pkttype & 0x0f) | (VSCP_MULTICAST_TYPE_EVENT1 << 4);
+
+    // Header
+    frame[VSCP_MULTICAST_PACKET1_POS_HEAD_MSB] = (pEvent->head >> 8) & 0xff;
+    frame[VSCP_MULTICAST_PACKET1_POS_HEAD_LSB] = pEvent->head & 0xff;
+
+    // 8-byte nanosecond timestamp
+    frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP]     = (pEvent->timestamp_ns >> 56) & 0xff;
+    frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 1] = (pEvent->timestamp_ns >> 48) & 0xff;
+    frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 2] = (pEvent->timestamp_ns >> 40) & 0xff;
+    frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 3] = (pEvent->timestamp_ns >> 32) & 0xff;
+    frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 4] = (pEvent->timestamp_ns >> 24) & 0xff;
+    frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 5] = (pEvent->timestamp_ns >> 16) & 0xff;
+    frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 6] = (pEvent->timestamp_ns >> 8) & 0xff;
+    frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 7] = pEvent->timestamp_ns & 0xff;
+
+    // Reserved bytes (set to 0)
+    frame[VSCP_MULTICAST_PACKET1_POS_RESERVED1] = 0;
+    frame[VSCP_MULTICAST_PACKET1_POS_RESERVED2] = 0;
+    frame[VSCP_MULTICAST_PACKET1_POS_RESERVED3] = 0;
+
+    // Class
+    frame[VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_MSB] = (pEvent->vscp_class >> 8) & 0xff;
+    frame[VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_LSB] = pEvent->vscp_class & 0xff;
+
+    // Type
+    frame[VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_MSB] = (pEvent->vscp_type >> 8) & 0xff;
+    frame[VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_LSB] = pEvent->vscp_type & 0xff;
+
+    // GUID
+    memcpy(frame + VSCP_MULTICAST_PACKET1_POS_VSCP_GUID, pEvent->GUID, 16);
+
+    // Size
+    frame[VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE_MSB] = (pEvent->sizeData >> 8) & 0xff;
+    frame[VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE_LSB] = pEvent->sizeData & 0xff;
+
+    // Data
+    if (pEvent->sizeData) {
+      memcpy(frame + VSCP_MULTICAST_PACKET1_POS_VSCP_DATA, pEvent->pdata, pEvent->sizeData);
+    }
+
+    // Calculate CRC
+    crc framecrc = crcFast((unsigned char const *) frame + 1, VSCP_MULTICAST_PACKET1_HEADER_LENGTH + pEvent->sizeData);
+
+    // CRC
+    frame[1 + VSCP_MULTICAST_PACKET1_HEADER_LENGTH + pEvent->sizeData]     = (framecrc >> 8) & 0xff;
+    frame[1 + VSCP_MULTICAST_PACKET1_HEADER_LENGTH + pEvent->sizeData + 1] = framecrc & 0xff;
   }
+  else {
+    // Packet format 0 - Original frame with microsecond timestamp and datetime fields
+    size_t calcSize = 1 +                                                          // Packet type
+                      VSCP_MULTICAST_PACKET0_HEADER_LENGTH + pEvent->sizeData + 2; // CRC
 
-  // Frame type
-  frame[VSCP_MULTICAST_PACKET0_POS_PKTTYPE] = pkttype;
+    if (len < calcSize) {
+      return false;
+    }
 
-  // Header
-  frame[VSCP_MULTICAST_PACKET0_POS_HEAD_MSB] = (pEvent->head >> 8) & 0xff;
-  frame[VSCP_MULTICAST_PACKET0_POS_HEAD_LSB] = pEvent->head & 0xff;
+    // Frame type
+    frame[VSCP_MULTICAST_PACKET0_POS_PKTTYPE] = pkttype;
 
-  // Timestamp
-  frame[VSCP_MULTICAST_PACKET0_POS_TIMESTAMP]     = (pEvent->timestamp >> 24) & 0xff;
-  frame[VSCP_MULTICAST_PACKET0_POS_TIMESTAMP + 1] = (pEvent->timestamp >> 16) & 0xff;
-  frame[VSCP_MULTICAST_PACKET0_POS_TIMESTAMP + 2] = (pEvent->timestamp >> 8) & 0xff;
-  frame[VSCP_MULTICAST_PACKET0_POS_TIMESTAMP + 3] = pEvent->timestamp & 0xff;
+    // Header
+    frame[VSCP_MULTICAST_PACKET0_POS_HEAD_MSB] = (pEvent->head >> 8) & 0xff;
+    frame[VSCP_MULTICAST_PACKET0_POS_HEAD_LSB] = pEvent->head & 0xff;
 
-  // Date / time block GMT
-  frame[VSCP_MULTICAST_PACKET0_POS_YEAR_MSB] = (pEvent->year >> 8) & 0xff;
-  frame[VSCP_MULTICAST_PACKET0_POS_YEAR_LSB] = pEvent->year & 0xff;
-  frame[VSCP_MULTICAST_PACKET0_POS_MONTH]    = pEvent->month;
-  frame[VSCP_MULTICAST_PACKET0_POS_DAY]      = pEvent->day;
-  frame[VSCP_MULTICAST_PACKET0_POS_HOUR]     = pEvent->hour;
-  frame[VSCP_MULTICAST_PACKET0_POS_MINUTE]   = pEvent->minute;
-  frame[VSCP_MULTICAST_PACKET0_POS_SECOND]   = pEvent->second;
+    // Timestamp
+    frame[VSCP_MULTICAST_PACKET0_POS_TIMESTAMP]     = (pEvent->timestamp >> 24) & 0xff;
+    frame[VSCP_MULTICAST_PACKET0_POS_TIMESTAMP + 1] = (pEvent->timestamp >> 16) & 0xff;
+    frame[VSCP_MULTICAST_PACKET0_POS_TIMESTAMP + 2] = (pEvent->timestamp >> 8) & 0xff;
+    frame[VSCP_MULTICAST_PACKET0_POS_TIMESTAMP + 3] = pEvent->timestamp & 0xff;
 
-  // Class
-  frame[VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_MSB] = (pEvent->vscp_class >> 8) & 0xff;
-  frame[VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_LSB] = pEvent->vscp_class & 0xff;
+    // Date / time block GMT
+    frame[VSCP_MULTICAST_PACKET0_POS_YEAR_MSB] = (pEvent->year >> 8) & 0xff;
+    frame[VSCP_MULTICAST_PACKET0_POS_YEAR_LSB] = pEvent->year & 0xff;
+    frame[VSCP_MULTICAST_PACKET0_POS_MONTH]    = pEvent->month;
+    frame[VSCP_MULTICAST_PACKET0_POS_DAY]      = pEvent->day;
+    frame[VSCP_MULTICAST_PACKET0_POS_HOUR]     = pEvent->hour;
+    frame[VSCP_MULTICAST_PACKET0_POS_MINUTE]   = pEvent->minute;
+    frame[VSCP_MULTICAST_PACKET0_POS_SECOND]   = pEvent->second;
 
-  // Type
-  frame[VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_MSB] = (pEvent->vscp_type >> 8) & 0xff;
-  frame[VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_LSB] = pEvent->vscp_type & 0xff;
+    // Class
+    frame[VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_MSB] = (pEvent->vscp_class >> 8) & 0xff;
+    frame[VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_LSB] = pEvent->vscp_class & 0xff;
 
-  // GUID
-  memcpy(frame + VSCP_MULTICAST_PACKET0_POS_VSCP_GUID, pEvent->GUID, 16);
+    // Type
+    frame[VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_MSB] = (pEvent->vscp_type >> 8) & 0xff;
+    frame[VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_LSB] = pEvent->vscp_type & 0xff;
 
-  // Size
-  frame[VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_MSB] = (pEvent->sizeData >> 8) & 0xff;
-  frame[VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_LSB] = pEvent->sizeData & 0xff;
+    // GUID
+    memcpy(frame + VSCP_MULTICAST_PACKET0_POS_VSCP_GUID, pEvent->GUID, 16);
 
-  // Data
-  if (pEvent->sizeData) {
-    memcpy(frame + VSCP_MULTICAST_PACKET0_POS_VSCP_DATA, pEvent->pdata, pEvent->sizeData);
+    // Size
+    frame[VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_MSB] = (pEvent->sizeData >> 8) & 0xff;
+    frame[VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_LSB] = pEvent->sizeData & 0xff;
+
+    // Data
+    if (pEvent->sizeData) {
+      memcpy(frame + VSCP_MULTICAST_PACKET0_POS_VSCP_DATA, pEvent->pdata, pEvent->sizeData);
+    }
+
+    // Calculate CRC
+    crc framecrc = crcFast((unsigned char const *) frame + 1, VSCP_MULTICAST_PACKET0_HEADER_LENGTH + pEvent->sizeData);
+
+    // CRC
+    frame[1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH + pEvent->sizeData]     = (framecrc >> 8) & 0xff;
+    frame[1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH + pEvent->sizeData + 1] = framecrc & 0xff;
   }
-
-  // Calculate CRC
-  crc framecrc = crcFast((unsigned char const *) frame + 1, VSCP_MULTICAST_PACKET0_HEADER_LENGTH + pEvent->sizeData);
-
-  // CRC
-  frame[1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH + pEvent->sizeData]     = (framecrc >> 8) & 0xff;
-  frame[1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH + pEvent->sizeData + 1] = framecrc & 0xff;
 
 #if 0
     printf("CRC1 %02X %02X\n",
@@ -7119,6 +7882,8 @@ vscp_writeEventExToFrame(uint8_t *frame, size_t len, uint8_t pkttype, const vscp
 ////////////////////////////////////////////////////////////////////////////////
 // vscp_getEventFromFrame
 //
+// Handles both packet format 0 (original) and packet format 1 (UNIX_NS nanosecond timestamp).
+//
 
 bool
 vscp_getEventFromFrame(vscpEvent *pEvent, const uint8_t *buf, size_t len)
@@ -7132,134 +7897,226 @@ vscp_getEventFromFrame(vscpEvent *pEvent, const uint8_t *buf, size_t len)
     return false;
   }
 
-  //  0           Packet type & encryption settings
-  //  1           HEAD MSB
-  //  2           HEAD LSB
-  //  3           Timestamp microseconds MSB
-  //  4           Timestamp microseconds
-  //  5           Timestamp microseconds
-  //  6           Timestamp microseconds LSB
-  //  7           Year MSB
-  //  8           Year LSB
-  //  9           Month
-  //  10          Day
-  //  11          Hour
-  //  12          Minute
-  //  13          Second
-  //  14          CLASS MSB
-  //  15          CLASS LSB
-  //  16          TYPE MSB
-  //  17          TYPE LSB
-  //  18 - 33     ORIGINATING GUID
-  //  34          DATA SIZE MSB
-  //  35          DATA SIZE LSB
-  //  36 - n 	    data limited to max 512 - 25 = 487 bytes
-  //  len - 2     CRC MSB( Calculated on HEAD + CLASS + TYPE + ADDRESS + SIZE
-  //  + DATA ) len - 1     CRC LSB
-  // if encrypted with AES128/192/256 16.bytes IV here.
+  // Get packet type from upper nibble
+  uint8_t pktType = GET_VSCP_MULTICAST_PACKET_TYPE(buf[0]);
 
-  size_t calcFrameSize = 1 +                                    // packet type & encryption
-                         VSCP_MULTICAST_PACKET0_HEADER_LENGTH + // header
-                         2 +                                    // CRC
-                         ((uint16_t) buf[VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_MSB] << 8) +
-                         buf[VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_LSB];
+  if (VSCP_MULTICAST_TYPE_EVENT1 == pktType) {
+    // Packet format 1 - UNIX_NS nanosecond timestamp
+    //  0           Packet type & encryption settings
+    //  1           HEAD MSB
+    //  2           HEAD LSB
+    //  3-10        Timestamp nanoseconds (8 bytes)
+    //  11-13       Reserved
+    //  14          CLASS MSB
+    //  15          CLASS LSB
+    //  16          TYPE MSB
+    //  17          TYPE LSB
+    //  18 - 33     ORIGINATING GUID
+    //  34          DATA SIZE MSB
+    //  35          DATA SIZE LSB
+    //  36 - n      data limited to max 512 - 25 = 487 bytes
+    //  len - 2     CRC MSB
+    //  len - 1     CRC LSB
 
-  // The buffer must hold a frame
-  if (len < calcFrameSize)
-    return false;
+    size_t calcFrameSize = 1 +                                    // packet type & encryption
+                           VSCP_MULTICAST_PACKET1_HEADER_LENGTH + // header
+                           2 +                                    // CRC
+                           ((uint16_t) buf[VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE_MSB] << 8) +
+                           buf[VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE_LSB];
 
-  crc crcFrame = ((uint16_t) buf[calcFrameSize - 2] << 8) + buf[calcFrameSize - 1];
-
-  // CRC check (only if not disabled)
-  crc crcnew;
-  if (!((buf[VSCP_MULTICAST_PACKET0_POS_HEAD_LSB] & VSCP_HEADER_NO_CRC) && (VSCP_NOCRC_CALC_DUMMY_CRC == crcFrame))) {
-
-#if 0
-    int i;
-    printf("DUMP = ");
-    for ( i=0; i<calcFrameSize; i++ ) {
-        printf("%02X ", buf[i] );
-    }
-    printf("\n");
-#endif
-
-    // Calculate & check CRC
-    crcnew = crcFast((unsigned char const *) buf + 1, (int) calcFrameSize - 1);
-    // CRC is zero if calculated over itself
-    if (crcnew) {
+    // The buffer must hold a frame
+    if (len < calcFrameSize)
       return false;
+
+    crc crcFrame = ((uint16_t) buf[calcFrameSize - 2] << 8) + buf[calcFrameSize - 1];
+
+    // CRC check (only if not disabled)
+    crc crcnew;
+    if (!((buf[VSCP_MULTICAST_PACKET1_POS_HEAD_LSB] & VSCP_HEADER_NO_CRC) && (VSCP_NOCRC_CALC_DUMMY_CRC == crcFrame))) {
+      // Calculate & check CRC
+      crcnew = crcFast((unsigned char const *) buf + 1, (int) calcFrameSize - 1);
+      // CRC is zero if calculated over itself
+      if (crcnew) {
+        return false;
+      }
     }
+
+    pEvent->sizeData =
+      ((uint16_t) buf[VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE_MSB] << 8) + buf[VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE_LSB];
+
+    // Allocate data
+    if (pEvent->sizeData) {
+      if (nullptr == (pEvent->pdata = new uint8_t[pEvent->sizeData])) {
+        return false;
+      }
+      // copy in data
+      memcpy(pEvent->pdata, buf + VSCP_MULTICAST_PACKET1_POS_VSCP_DATA, pEvent->sizeData);
+    }
+    else {
+      pEvent->pdata = nullptr;
+    }
+
+    // Head
+    pEvent->head = ((uint16_t) buf[VSCP_MULTICAST_PACKET1_POS_HEAD_MSB] << 8) + buf[VSCP_MULTICAST_PACKET1_POS_HEAD_LSB];
+
+    // Copy in GUID
+    memcpy(pEvent->GUID, buf + VSCP_MULTICAST_PACKET1_POS_VSCP_GUID, 16);
+
+    // Set CRC
+    pEvent->crc = crcFrame;
+
+    // Set nanosecond timestamp
+    pEvent->timestamp_ns = ((uint64_t) buf[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP] << 56) +
+                           ((uint64_t) buf[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 1] << 48) +
+                           ((uint64_t) buf[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 2] << 40) +
+                           ((uint64_t) buf[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 3] << 32) +
+                           ((uint64_t) buf[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 4] << 24) +
+                           ((uint64_t) buf[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 5] << 16) +
+                           ((uint64_t) buf[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 6] << 8) +
+                           buf[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 7];
+
+    // If timestamp is zero, set it
+    if (0 == pEvent->timestamp_ns) {
+      pEvent->timestamp_ns = vscp_makeTimeStampNs();
+    }
+
+    // Set UNIX_NS markers for year/month
+    pEvent->year = 0xffff;
+    pEvent->month = 0xff;
+
+    // VSCP Class
+    pEvent->vscp_class =
+      ((uint16_t) buf[VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_MSB] << 8) + buf[VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_LSB];
+
+    // VSCP Type
+    pEvent->vscp_type =
+      ((uint16_t) buf[VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_MSB] << 8) + buf[VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_LSB];
   }
+  else {
+    // Packet format 0 - Original with microsecond timestamp and datetime fields
+    //  0           Packet type & encryption settings
+    //  1           HEAD MSB
+    //  2           HEAD LSB
+    //  3           Timestamp microseconds MSB
+    //  4           Timestamp microseconds
+    //  5           Timestamp microseconds
+    //  6           Timestamp microseconds LSB
+    //  7           Year MSB
+    //  8           Year LSB
+    //  9           Month
+    //  10          Day
+    //  11          Hour
+    //  12          Minute
+    //  13          Second
+    //  14          CLASS MSB
+    //  15          CLASS LSB
+    //  16          TYPE MSB
+    //  17          TYPE LSB
+    //  18 - 33     ORIGINATING GUID
+    //  34          DATA SIZE MSB
+    //  35          DATA SIZE LSB
+    //  36 - n      data limited to max 512 - 25 = 487 bytes
+    //  len - 2     CRC MSB
+    //  len - 1     CRC LSB
+    // if encrypted with AES128/192/256 16.bytes IV here.
 
-  pEvent->sizeData =
-    ((uint16_t) buf[VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_MSB] << 8) + buf[VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_LSB];
+    size_t calcFrameSize = 1 +                                    // packet type & encryption
+                           VSCP_MULTICAST_PACKET0_HEADER_LENGTH + // header
+                           2 +                                    // CRC
+                           ((uint16_t) buf[VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_MSB] << 8) +
+                           buf[VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_LSB];
 
-  // Allocate data
-  if (nullptr == (pEvent->pdata = new uint8_t[pEvent->sizeData])) {
-    return false;
-  }
+    // The buffer must hold a frame
+    if (len < calcFrameSize)
+      return false;
 
-  // copy in data
-  memcpy(pEvent->pdata, buf + VSCP_MULTICAST_PACKET0_POS_VSCP_DATA, pEvent->sizeData);
+    crc crcFrame = ((uint16_t) buf[calcFrameSize - 2] << 8) + buf[calcFrameSize - 1];
 
-  // Head
-  pEvent->head = ((uint16_t) buf[VSCP_MULTICAST_PACKET0_POS_HEAD_MSB] << 8) + buf[VSCP_MULTICAST_PACKET0_POS_HEAD_LSB];
+    // CRC check (only if not disabled)
+    crc crcnew;
+    if (!((buf[VSCP_MULTICAST_PACKET0_POS_HEAD_LSB] & VSCP_HEADER_NO_CRC) && (VSCP_NOCRC_CALC_DUMMY_CRC == crcFrame))) {
+      // Calculate & check CRC
+      crcnew = crcFast((unsigned char const *) buf + 1, (int) calcFrameSize - 1);
+      // CRC is zero if calculated over itself
+      if (crcnew) {
+        return false;
+      }
+    }
 
-  // Copy in GUID
-  memcpy(pEvent->GUID, buf + VSCP_MULTICAST_PACKET0_POS_VSCP_GUID, pEvent->sizeData);
+    pEvent->sizeData =
+      ((uint16_t) buf[VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_MSB] << 8) + buf[VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_LSB];
 
-  // Set CRC
-  pEvent->crc = crcFrame;
+    // Allocate data
+    if (pEvent->sizeData) {
+      if (nullptr == (pEvent->pdata = new uint8_t[pEvent->sizeData])) {
+        return false;
+      }
+      // copy in data
+      memcpy(pEvent->pdata, buf + VSCP_MULTICAST_PACKET0_POS_VSCP_DATA, pEvent->sizeData);
+    }
+    else {
+      pEvent->pdata = nullptr;
+    }
 
-  // Set timestamp
-  pEvent->timestamp = ((uint32_t) buf[VSCP_MULTICAST_PACKET0_POS_TIMESTAMP] << 24) +
-                      ((uint32_t) buf[VSCP_MULTICAST_PACKET0_POS_TIMESTAMP + 1] << 16) +
-                      ((uint32_t) buf[VSCP_MULTICAST_PACKET0_POS_TIMESTAMP + 2] << 8) +
-                      buf[VSCP_MULTICAST_PACKET0_POS_TIMESTAMP + 3];
+    // Head
+    pEvent->head = ((uint16_t) buf[VSCP_MULTICAST_PACKET0_POS_HEAD_MSB] << 8) + buf[VSCP_MULTICAST_PACKET0_POS_HEAD_LSB];
 
-  // If timestamp is zero, set it
-  if (0 == pEvent->timestamp) {
-    pEvent->timestamp = vscp_makeTimeStamp();
-  }
+    // Copy in GUID
+    memcpy(pEvent->GUID, buf + VSCP_MULTICAST_PACKET0_POS_VSCP_GUID, 16);
 
-  // Date/time
-  pEvent->year  = ((uint16_t) buf[VSCP_MULTICAST_PACKET0_POS_YEAR_MSB] << 8) + buf[VSCP_MULTICAST_PACKET0_POS_YEAR_LSB];
-  pEvent->month = buf[VSCP_MULTICAST_PACKET0_POS_MONTH];
-  pEvent->day   = buf[VSCP_MULTICAST_PACKET0_POS_DAY];
-  pEvent->hour  = buf[VSCP_MULTICAST_PACKET0_POS_HOUR];
-  pEvent->minute = buf[VSCP_MULTICAST_PACKET0_POS_MINUTE];
-  pEvent->second = buf[VSCP_MULTICAST_PACKET0_POS_SECOND];
+    // Set CRC
+    pEvent->crc = crcFrame;
 
-  // If date/time field is zero set GMT now
-  if ((0 == pEvent->year) && (0 == pEvent->month) && (0 == pEvent->day) && (0 == pEvent->hour) &&
-      (0 == pEvent->minute) && (0 == pEvent->second)) {
+    // Set timestamp
+    pEvent->timestamp = ((uint32_t) buf[VSCP_MULTICAST_PACKET0_POS_TIMESTAMP] << 24) +
+                        ((uint32_t) buf[VSCP_MULTICAST_PACKET0_POS_TIMESTAMP + 1] << 16) +
+                        ((uint32_t) buf[VSCP_MULTICAST_PACKET0_POS_TIMESTAMP + 2] << 8) +
+                        buf[VSCP_MULTICAST_PACKET0_POS_TIMESTAMP + 3];
 
-    time_t rawtime;
-    struct tm *ptm;
+    // If timestamp is zero, set it
+    if (0 == pEvent->timestamp) {
+      pEvent->timestamp = vscp_makeTimeStamp();
+    }
 
-    time(&rawtime);
+    // Date/time
+    pEvent->year  = ((uint16_t) buf[VSCP_MULTICAST_PACKET0_POS_YEAR_MSB] << 8) + buf[VSCP_MULTICAST_PACKET0_POS_YEAR_LSB];
+    pEvent->month = buf[VSCP_MULTICAST_PACKET0_POS_MONTH];
+    pEvent->day   = buf[VSCP_MULTICAST_PACKET0_POS_DAY];
+    pEvent->hour  = buf[VSCP_MULTICAST_PACKET0_POS_HOUR];
+    pEvent->minute = buf[VSCP_MULTICAST_PACKET0_POS_MINUTE];
+    pEvent->second = buf[VSCP_MULTICAST_PACKET0_POS_SECOND];
+
+    // If date/time field is zero set GMT now
+    if ((0 == pEvent->year) && (0 == pEvent->month) && (0 == pEvent->day) && (0 == pEvent->hour) &&
+        (0 == pEvent->minute) && (0 == pEvent->second)) {
+
+      time_t rawtime;
+      struct tm *ptm;
+
+      time(&rawtime);
 #ifdef WIN32
-    ptm = gmtime(&rawtime);
+      ptm = gmtime(&rawtime);
 #else
-    struct tm tbuf;
-    ptm = gmtime_r(&rawtime, &tbuf);
+      struct tm tbuf;
+      ptm = gmtime_r(&rawtime, &tbuf);
 #endif
 
-    pEvent->year   = ptm->tm_year + 1900;
-    pEvent->month  = ptm->tm_mon + 1;
-    pEvent->day    = ptm->tm_mday;
-    pEvent->hour   = ptm->tm_hour;
-    pEvent->minute = ptm->tm_min;
-    pEvent->second = ptm->tm_sec;
+      pEvent->year   = ptm->tm_year + 1900;
+      pEvent->month  = ptm->tm_mon + 1;
+      pEvent->day    = ptm->tm_mday;
+      pEvent->hour   = ptm->tm_hour;
+      pEvent->minute = ptm->tm_min;
+      pEvent->second = ptm->tm_sec;
+    }
+
+    // VSCP Class
+    pEvent->vscp_class =
+      ((uint16_t) buf[VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_MSB] << 8) + buf[VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_LSB];
+
+    // VSCP Type
+    pEvent->vscp_type =
+      ((uint16_t) buf[VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_MSB] << 8) + buf[VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_LSB];
   }
-
-  // VSCP Class
-  pEvent->vscp_class =
-    ((uint16_t) buf[VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_MSB] << 8) + buf[VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_LSB];
-
-  // VSCP Type
-  pEvent->vscp_type =
-    ((uint16_t) buf[VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_MSB] << 8) + buf[VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_LSB];
 
   // obid - set to zero so interface fill it in
   pEvent->obid = 0;
@@ -7270,32 +8127,35 @@ vscp_getEventFromFrame(vscpEvent *pEvent, const uint8_t *buf, size_t len)
 ////////////////////////////////////////////////////////////////////////////////
 // vscp_getEventExFromFrame
 //
+// Handles both packet format 0 (original) and packet format 1 (UNIX_NS nanosecond timestamp).
+//
 
 bool
 vscp_getEventExFromFrame(vscpEventEx *pEventEx, const uint8_t *frame, size_t len)
 {
-  vscpEvent *pEvent;
+  // Check pointer
+  if (nullptr == pEventEx) {
+    return false;
+  }
 
-  pEvent = new vscpEvent;
+  vscpEvent *pEvent = new vscpEvent;
   if (nullptr == pEvent) {
     return false;
   }
   pEvent->pdata = nullptr;
 
-  // Check pointer (rest is checked in vscp_getVscpEventFromUdpFrame)
-  if (nullptr == pEventEx) {
-    return false;
-  }
-
   if (!vscp_getEventFromFrame(pEvent, frame, len)) {
+    vscp_deleteEvent_v2(&pEvent);
     return false;
   }
 
-  // Convert eventEx to event
-  if (vscp_convertEventToEventEx(pEventEx, pEvent)) {
+  // Convert event to eventEx
+  if (!vscp_convertEventToEventEx(pEventEx, pEvent)) {
+    vscp_deleteEvent_v2(&pEvent);
     return false;
   }
 
+  vscp_deleteEvent_v2(&pEvent);
   return true;
 }
 

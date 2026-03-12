@@ -230,6 +230,13 @@ typedef vscpEventEx *PVSCPEVENTEX;
 #define VSCP_HEADER16_GUID_TYPE_RFC4122V4 0x3000 /* GUID is RFC 4122 Version 4 */
 #define VSCP_HEADER16_GUID_TYPE_RANDOM    0x4000 /* GUID is random number (not recommended) */
 
+// Frame version bits (8-9)
+#define VSCP_HEADER16_FRAME_VERSION_MASK     0x0300
+#define VSCP_HEADER16_FRAME_VERSION_ORIGINAL 0x0000 /* Original frame format */
+#define VSCP_HEADER16_FRAME_VERSION_UNIX_NS  0x0100 /* Frame with Unix timestamp with nanosecond precision */
+#define VSCP_HEADER16_FRAME_VERSION_2        0x0200 /* Reserved */
+#define VSCP_HEADER16_FRAME_VERSION_3        0x0300 /* Reserved */
+
 #define VSCP_MASK_PRIORITY  0xE0
 #define VSCP_MASK_GUID_TYPE 0x8000
 #define VSCP_MASK_HARDCODED 0x10
@@ -389,8 +396,39 @@ typedef VSCPChannelInfo *PVSCPCHANNELINFO;
 // Maximum packet size (for buffer allocation)
 #define VSCP_MULTICAST_PACKET0_MAX (1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH + 2 + VSCP_LEVEL2_MAXDATA + 16)
 
+/* Packet frame format type = 1 (UNIX_NS nanosecond timestamp)  */
+/*      without byte0 and CRC                                   */
+/*      total frame size is 1 + 35 + 2 + data-length            */
+#define VSCP_MULTICAST_PACKET1_HEADER_LENGTH 35
+
+/* Multicast packet1 ordinals */
+#define VSCP_MULTICAST_PACKET1_POS_PKTTYPE        0
+#define VSCP_MULTICAST_PACKET1_POS_HEAD           1
+#define VSCP_MULTICAST_PACKET1_POS_HEAD_MSB       1
+#define VSCP_MULTICAST_PACKET1_POS_HEAD_LSB       2
+#define VSCP_MULTICAST_PACKET1_POS_TIMESTAMP      3   /* 8-byte nanosecond timestamp */
+#define VSCP_MULTICAST_PACKET1_POS_RESERVED1      11  /* Reserved byte 1 */
+#define VSCP_MULTICAST_PACKET1_POS_RESERVED2      12  /* Reserved byte 2 */
+#define VSCP_MULTICAST_PACKET1_POS_RESERVED3      13  /* Reserved byte 3 */
+#define VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS     14
+#define VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_MSB 14
+#define VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_LSB 15
+#define VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE      16
+#define VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_MSB  16
+#define VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_LSB  17
+#define VSCP_MULTICAST_PACKET1_POS_VSCP_GUID      18
+#define VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE      34
+#define VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE_MSB  34
+#define VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE_LSB  35
+#define VSCP_MULTICAST_PACKET1_POS_VSCP_DATA      36
+
+// Maximum packet1 size (for buffer allocation)
+#define VSCP_MULTICAST_PACKET1_MAX (1 + VSCP_MULTICAST_PACKET1_HEADER_LENGTH + 2 + VSCP_LEVEL2_MAXDATA + 16)
+
 /* VSCP multicast packet types */
-#define VSCP_MULTICAST_TYPE_EVENT 0
+#define VSCP_MULTICAST_TYPE_EVENT0 0
+#define VSCP_MULTICAST_TYPE_EVENT1 1
+#define VSCP_MULTICAST_TYPE_EVENT  0  /* Legacy alias */
 
 #define SET_VSCP_MULTICAST_TYPE(type, encryption)  ((type << 4) | encryption)
 #define GET_VSCP_MULTICAST_PACKET_TYPE(type)       ((type >> 4) & 0x0f)
@@ -696,13 +734,12 @@ struct vscpMyNode {
 #define VSCP_ERROR_INVALID_FORMAT     69 /* Format is wrong. Error in conversion */
 #define VSCP_ERROR_INVALID_CONTEXT    70 /* Context is invalid or missing */
 
-
 /*!
   A timestamp that is less than this value is considered to be an event that should
   have date and time set by the receiving end. This is the same as was true before
-  when all parts of datetime were set to zero. 
+  when all parts of datetime were set to zero.
 */
-#define VSCP_TIMESTAMP_ONE_SECOND 1000000000  /* One second in nanoseconds */
+#define VSCP_TIMESTAMP_ONE_SECOND 1000000000 /* One second in nanoseconds */
 
 /*!
     HLO (High Level Object) type (bits 7,6,5,4)

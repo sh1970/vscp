@@ -1,0 +1,53 @@
+name: Unit Tests
+
+on:
+  push:
+    branches: [ master, main, development ]
+  pull_request:
+    branches: [ master, main, development ]
+
+env:
+  BUILD_TYPE: Debug
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'recursive'
+     
+    - name: Update package lists
+      run: sudo apt-get update
+
+    - name: Install Google Test
+      run: sudo apt-get install -y libgtest-dev && cd /usr/src/gtest && sudo mkdir -p build && cd build && sudo cmake .. && sudo make && sudo make install
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get install -y \
+          libssl-dev \
+          libexpat-dev \
+          libcurl4-openssl-dev
+
+    - name: Create test build directory
+      run: cmake -E make_directory ${{github.workspace}}/tests/build
+
+    - name: Configure unit tests
+      working-directory: ${{github.workspace}}/tests/build
+      run: cmake .. -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+
+    - name: Build unit tests
+      working-directory: ${{github.workspace}}/tests/build
+      run: make -j$(nproc)
+
+    - name: Run unit tests
+      working-directory: ${{github.workspace}}/tests/build
+      run: |
+        echo "Running GUID tests..."
+        ./guid/unittest_guid
+        echo "Running DateTime tests..."
+        ./vscpdatetime/unittest_datetime
+        echo "Running VscpHelper tests..."
+        ./vscphelper/unittest_vscphelper

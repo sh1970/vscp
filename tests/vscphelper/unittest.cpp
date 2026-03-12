@@ -32,6 +32,7 @@
 #include "vscphelper.h"
 #include "vscp.h"
 #include "guid.h"
+#include "canal.h"
 
 // =============================================================================
 //                           String Value Parsing
@@ -568,6 +569,125 @@ TEST(VscpHelper, getGuidFromStringToArray)
     }
 }
 
+TEST(VscpHelper, getGuidFromStringToArray_UUID)
+{
+    uint8_t guid[16];
+    // UUID format: 8-4-4-4-12 hex digits
+    std::string strGUID = "00010203-0405-0607-0809-0A0B0C0D0E0F";
+    
+    EXPECT_TRUE(vscp_getGuidFromStringToArray(guid, strGUID));
+    
+    for (int i = 0; i < 16; i++) {
+        EXPECT_EQ(i, guid[i]);
+    }
+}
+
+TEST(VscpHelper, getGuidFromStringToArray_Empty)
+{
+    uint8_t guid[16];
+    memset(guid, 0xFF, 16);  // Pre-fill with non-zero
+    
+    // Empty string should result in all zeros
+    EXPECT_TRUE(vscp_getGuidFromStringToArray(guid, ""));
+    
+    for (int i = 0; i < 16; i++) {
+        EXPECT_EQ(0, guid[i]);
+    }
+}
+
+TEST(VscpHelper, getGuidFromStringToArray_Dash)
+{
+    uint8_t guid[16];
+    memset(guid, 0xFF, 16);  // Pre-fill with non-zero
+    
+    // "-" means all zeros
+    EXPECT_TRUE(vscp_getGuidFromStringToArray(guid, "-"));
+    
+    for (int i = 0; i < 16; i++) {
+        EXPECT_EQ(0, guid[i]);
+    }
+}
+
+TEST(VscpHelper, getGuidFromStringToArray_LeadingZeros)
+{
+    uint8_t guid[16];
+    
+    // "-:" prefix means leading zeros with trailing values
+    EXPECT_TRUE(vscp_getGuidFromStringToArray(guid, "-:01:02:03"));
+    
+    // First 13 bytes should be zero
+    for (int i = 0; i < 13; i++) {
+        EXPECT_EQ(0, guid[i]);
+    }
+    // Last 3 bytes should be 1, 2, 3
+    EXPECT_EQ(0x01, guid[13]);
+    EXPECT_EQ(0x02, guid[14]);
+    EXPECT_EQ(0x03, guid[15]);
+}
+
+TEST(VscpHelper, getGuidFromStringToArray_Compact)
+{
+    uint8_t guid[16];
+    
+    // "::" prefix means leading 0xFF bytes with trailing values
+    EXPECT_TRUE(vscp_getGuidFromStringToArray(guid, "::01:02:03"));
+    
+    // First 13 bytes should be 0xFF
+    for (int i = 0; i < 13; i++) {
+        EXPECT_EQ(0xFF, guid[i]);
+    }
+    // Last 3 bytes should be 1, 2, 3
+    EXPECT_EQ(0x01, guid[13]);
+    EXPECT_EQ(0x02, guid[14]);
+    EXPECT_EQ(0x03, guid[15]);
+}
+
+TEST(VscpHelper, getGuidFromStringToArray_CompactAllFF)
+{
+    uint8_t guid[16];
+    
+    // "::" alone means all 0xFF
+    EXPECT_TRUE(vscp_getGuidFromStringToArray(guid, "::"));
+    
+    for (int i = 0; i < 16; i++) {
+        EXPECT_EQ(0xFF, guid[i]);
+    }
+}
+
+TEST(VscpHelper, getGuidFromStringToArray_WithBraces)
+{
+    uint8_t guid[16];
+    std::string strGUID = "{00:01:02:03:04:05:06:07:08:09:0A:0B:0C:0D:0E:0F}";
+    
+    EXPECT_TRUE(vscp_getGuidFromStringToArray(guid, strGUID));
+    
+    for (int i = 0; i < 16; i++) {
+        EXPECT_EQ(i, guid[i]);
+    }
+}
+
+TEST(VscpHelper, getGuidFromStringToArray_NullPointer)
+{
+    // Should return false for null pointer
+    EXPECT_FALSE(vscp_getGuidFromStringToArray(nullptr, "00:01:02:03:04:05:06:07:08:09:0A:0B:0C:0D:0E:0F"));
+}
+
+TEST(VscpHelper, getGuidFromStringToArray_Lowercase)
+{
+    uint8_t guid[16];
+    // Lowercase hex should work
+    std::string strGUID = "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99";
+    
+    EXPECT_TRUE(vscp_getGuidFromStringToArray(guid, strGUID));
+    
+    EXPECT_EQ(0xAA, guid[0]);
+    EXPECT_EQ(0xBB, guid[1]);
+    EXPECT_EQ(0xCC, guid[2]);
+    EXPECT_EQ(0xDD, guid[3]);
+    EXPECT_EQ(0xEE, guid[4]);
+    EXPECT_EQ(0xFF, guid[5]);
+}
+
 TEST(VscpHelper, writeGuidArrayToString)
 {
     uint8_t guid[16] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
@@ -576,6 +696,150 @@ TEST(VscpHelper, writeGuidArrayToString)
     
     EXPECT_TRUE(vscp_writeGuidArrayToString(strGUID, guid));
     EXPECT_EQ("00:01:02:03:04:05:06:07:08:09:0A:0B:0C:0D:0E:0F", strGUID);
+}
+
+TEST(VscpHelper, writeGuidArrayToString_UUID)
+{
+    uint8_t guid[16] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                        0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
+    std::string strGUID;
+    
+    EXPECT_TRUE(vscp_writeGuidArrayToString(strGUID, guid, false, VSCP_GUID_STR_FORMAT_UUID));
+    EXPECT_EQ("00010203-0405-0607-0809-0A0B0C0D0E0F", strGUID);
+}
+
+TEST(VscpHelper, writeGuidArrayToString_Compact)
+{
+    std::string strGUID;
+    
+    // GUID with leading 0xFF bytes
+    uint8_t guid1[16] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                         0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x02, 0x03};
+    EXPECT_TRUE(vscp_writeGuidArrayToString(strGUID, guid1, false, VSCP_GUID_STR_FORMAT_COMPACT));
+    EXPECT_EQ("::01:02:03", strGUID);
+    
+    // All 0xFF
+    uint8_t guid2[16] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                         0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    EXPECT_TRUE(vscp_writeGuidArrayToString(strGUID, guid2, false, VSCP_GUID_STR_FORMAT_COMPACT));
+    EXPECT_EQ("::", strGUID);
+    
+    // No leading 0xFF - should use normal format
+    uint8_t guid3[16] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                         0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
+    EXPECT_TRUE(vscp_writeGuidArrayToString(strGUID, guid3, false, VSCP_GUID_STR_FORMAT_COMPACT));
+    EXPECT_EQ("00:01:02:03:04:05:06:07:08:09:0A:0B:0C:0D:0E:0F", strGUID);
+}
+
+TEST(VscpHelper, writeGuidArrayToString_Comma)
+{
+    uint8_t guid[16] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                        0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
+    std::string strGUID;
+    
+    // bUseComma = true gives decimal comma-separated
+    EXPECT_TRUE(vscp_writeGuidArrayToString(strGUID, guid, true));
+    EXPECT_EQ("0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15", strGUID);
+}
+
+TEST(VscpHelper, writeGuidToString_Normal)
+{
+    vscpEvent ev;
+    memset(&ev, 0, sizeof(ev));
+    uint8_t guid[16] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                        0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
+    memcpy(ev.GUID, guid, 16);
+    std::string strGUID;
+    
+    // Default format (normal)
+    EXPECT_TRUE(vscp_writeGuidToString(strGUID, &ev));
+    EXPECT_EQ("00:01:02:03:04:05:06:07:08:09:0A:0B:0C:0D:0E:0F", strGUID);
+    
+    // Explicit normal format
+    EXPECT_TRUE(vscp_writeGuidToString(strGUID, &ev, VSCP_GUID_STR_FORMAT_NORMAL));
+    EXPECT_EQ("00:01:02:03:04:05:06:07:08:09:0A:0B:0C:0D:0E:0F", strGUID);
+}
+
+TEST(VscpHelper, writeGuidToString_UUID)
+{
+    vscpEvent ev;
+    memset(&ev, 0, sizeof(ev));
+    uint8_t guid[16] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                        0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
+    memcpy(ev.GUID, guid, 16);
+    std::string strGUID;
+    
+    EXPECT_TRUE(vscp_writeGuidToString(strGUID, &ev, VSCP_GUID_STR_FORMAT_UUID));
+    EXPECT_EQ("00010203-0405-0607-0809-0A0B0C0D0E0F", strGUID);
+}
+
+TEST(VscpHelper, writeGuidToString_Compact)
+{
+    vscpEvent ev;
+    memset(&ev, 0, sizeof(ev));
+    std::string strGUID;
+    
+    // GUID with leading 0xFF bytes
+    uint8_t guid1[16] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                         0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x02, 0x03};
+    memcpy(ev.GUID, guid1, 16);
+    EXPECT_TRUE(vscp_writeGuidToString(strGUID, &ev, VSCP_GUID_STR_FORMAT_COMPACT));
+    EXPECT_EQ("::01:02:03", strGUID);
+    
+    // All 0xFF
+    uint8_t guid2[16] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                         0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    memcpy(ev.GUID, guid2, 16);
+    EXPECT_TRUE(vscp_writeGuidToString(strGUID, &ev, VSCP_GUID_STR_FORMAT_COMPACT));
+    EXPECT_EQ("::", strGUID);
+    
+    // No leading 0xFF - should use normal format
+    uint8_t guid3[16] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                         0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
+    memcpy(ev.GUID, guid3, 16);
+    EXPECT_TRUE(vscp_writeGuidToString(strGUID, &ev, VSCP_GUID_STR_FORMAT_COMPACT));
+    EXPECT_EQ("00:01:02:03:04:05:06:07:08:09:0A:0B:0C:0D:0E:0F", strGUID);
+}
+
+TEST(VscpHelper, writeGuidToStringEx_Normal)
+{
+    vscpEventEx ev;
+    memset(&ev, 0, sizeof(ev));
+    uint8_t guid[16] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                        0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
+    memcpy(ev.GUID, guid, 16);
+    std::string strGUID;
+    
+    // Default format
+    EXPECT_TRUE(vscp_writeGuidToStringEx(strGUID, &ev));
+    EXPECT_EQ("00:01:02:03:04:05:06:07:08:09:0A:0B:0C:0D:0E:0F", strGUID);
+}
+
+TEST(VscpHelper, writeGuidToStringEx_UUID)
+{
+    vscpEventEx ev;
+    memset(&ev, 0, sizeof(ev));
+    uint8_t guid[16] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                        0x01, 0x02, 0xAA, 0xBB, 0x44, 0x01, 0x30, 0x00};
+    memcpy(ev.GUID, guid, 16);
+    std::string strGUID;
+    
+    EXPECT_TRUE(vscp_writeGuidToStringEx(strGUID, &ev, VSCP_GUID_STR_FORMAT_UUID));
+    EXPECT_EQ("FFFFFFFF-FFFF-FFFF-0102-AABB44013000", strGUID);
+}
+
+TEST(VscpHelper, writeGuidToStringEx_Compact)
+{
+    vscpEventEx ev;
+    memset(&ev, 0, sizeof(ev));
+    std::string strGUID;
+    
+    // GUID with leading 0xFF bytes
+    uint8_t guid1[16] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                         0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xAA, 0xBB, 0xCC};
+    memcpy(ev.GUID, guid1, 16);
+    EXPECT_TRUE(vscp_writeGuidToStringEx(strGUID, &ev, VSCP_GUID_STR_FORMAT_COMPACT));
+    EXPECT_EQ("::AA:BB:CC", strGUID);
 }
 
 TEST(VscpHelper, isGUIDEmpty)
@@ -658,6 +922,22 @@ TEST(VscpHelper, getMsTimeStamp)
     EXPECT_GE(ts2, ts1);
 }
 
+TEST(VscpHelper, makeTimeStampNs)
+{
+    uint64_t ts1 = vscp_makeTimeStampNs();
+    uint64_t ts2 = vscp_makeTimeStampNs();
+    
+    // Timestamps should be non-zero and close in value
+    EXPECT_GT(ts1, 0ULL);
+    EXPECT_GE(ts2, ts1);
+    
+    // Verify timestamp is in reasonable range (after year 2020, before year 2100)
+    // 2020-01-01 00:00:00 UTC = 1577836800 seconds = 1577836800000000000 ns
+    // 2100-01-01 00:00:00 UTC = 4102444800 seconds = 4102444800000000000 ns
+    EXPECT_GT(ts1, 1577836800000000000ULL);
+    EXPECT_LT(ts1, 4102444800000000000ULL);
+}
+
 // =============================================================================
 //                           Event Priority
 // =============================================================================
@@ -704,6 +984,87 @@ TEST(VscpHelper, eventToEventEx_Empty)
     EXPECT_EQ(0, eventEx.sizeData);
 }
 
+TEST(VscpHelper, eventToEventEx_OriginalFrame)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.pdata = nullptr;
+    event.sizeData = 0;
+    
+    // Set header with ORIGINAL frame version (0x0000)
+    event.head = VSCP_HEADER16_FRAME_VERSION_ORIGINAL | 0x0003;  // priority bits
+    event.vscp_class = 10;
+    event.vscp_type = 6;
+    event.year = 2026;
+    event.month = 3;
+    // Note: day, hour, minute, second, timestamp share a union with timestamp_ns
+    event.day = 12;
+    event.hour = 14;
+    event.minute = 30;
+    event.second = 45;
+    event.timestamp = 123456789;
+    event.obid = 42;
+    memset(event.GUID, 0xAA, 16);
+    
+    vscpEventEx eventEx;
+    EXPECT_TRUE(vscp_convertEventToEventEx(&eventEx, &event));
+    
+    EXPECT_EQ(event.head, eventEx.head);
+    EXPECT_EQ(10, eventEx.vscp_class);
+    EXPECT_EQ(6, eventEx.vscp_type);
+    EXPECT_EQ(2026, eventEx.year);
+    EXPECT_EQ(3, eventEx.month);
+    EXPECT_EQ(12, eventEx.day);
+    EXPECT_EQ(14, eventEx.hour);
+    EXPECT_EQ(30, eventEx.minute);
+    EXPECT_EQ(45, eventEx.second);
+    EXPECT_EQ(123456789, eventEx.timestamp);
+    EXPECT_EQ(42, eventEx.obid);
+    
+    for (int i = 0; i < 16; i++) {
+        EXPECT_EQ(0xAA, eventEx.GUID[i]);
+    }
+}
+
+TEST(VscpHelper, eventToEventEx_UnixNsFrame)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.pdata = new uint8_t[3]{0x11, 0x22, 0x33};
+    event.sizeData = 3;
+    
+    // Set header with UNIX_NS frame version (0x0100)
+    event.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS | 0x0007;  // priority bits
+    event.vscp_class = 20;
+    event.vscp_type = 10;
+    // Note: timestamp_ns shares a union with day/hour/minute/second/timestamp
+    event.timestamp_ns = 1234567890123456789ULL;  // Unix nanoseconds
+    event.obid = 99;
+    memset(event.GUID, 0xBB, 16);
+    
+    vscpEventEx eventEx;
+    EXPECT_TRUE(vscp_convertEventToEventEx(&eventEx, &event));
+    
+    EXPECT_EQ(event.head, eventEx.head);
+    EXPECT_EQ(20, eventEx.vscp_class);
+    EXPECT_EQ(10, eventEx.vscp_type);
+    EXPECT_EQ(1234567890123456789ULL, eventEx.timestamp_ns);
+    // For UNIX_NS frame, year should be 0xffff and month 0xff
+    EXPECT_EQ(0xffff, eventEx.year);
+    EXPECT_EQ(0xff, eventEx.month);
+    EXPECT_EQ(99, eventEx.obid);
+    EXPECT_EQ(3, eventEx.sizeData);
+    EXPECT_EQ(0x11, eventEx.data[0]);
+    EXPECT_EQ(0x22, eventEx.data[1]);
+    EXPECT_EQ(0x33, eventEx.data[2]);
+    
+    for (int i = 0; i < 16; i++) {
+        EXPECT_EQ(0xBB, eventEx.GUID[i]);
+    }
+    
+    delete[] event.pdata;
+}
+
 TEST(VscpHelper, eventExToEvent)
 {
     vscpEventEx eventEx;
@@ -727,6 +1088,105 @@ TEST(VscpHelper, eventExToEvent)
     EXPECT_EQ(1, event.pdata[0]);
     EXPECT_EQ(2, event.pdata[1]);
     EXPECT_EQ(3, event.pdata[2]);
+    
+    vscp_deleteEvent(&event);
+}
+
+TEST(VscpHelper, eventExToEvent_OriginalFrame)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    
+    // Set header with ORIGINAL frame version (0x0000)
+    eventEx.head = VSCP_HEADER16_FRAME_VERSION_ORIGINAL | 0x0003;  // priority bits
+    eventEx.vscp_class = 10;
+    eventEx.vscp_type = 6;
+    eventEx.year = 2026;
+    eventEx.month = 3;
+    // Note: In vscpEventEx, day/hour/minute/second/timestamp share union with timestamp_ns AND crc
+    eventEx.day = 12;
+    eventEx.hour = 14;
+    eventEx.minute = 30;
+    eventEx.second = 45;
+    eventEx.timestamp = 123456789;
+    eventEx.obid = 42;
+    eventEx.sizeData = 2;
+    eventEx.data[0] = 0xAA;
+    eventEx.data[1] = 0xBB;
+    memset(eventEx.GUID, 0xCC, 16);
+    
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.pdata = nullptr;
+    
+    EXPECT_TRUE(vscp_convertEventExToEvent(&event, &eventEx));
+    
+    EXPECT_EQ(eventEx.head, event.head);
+    EXPECT_EQ(10, event.vscp_class);
+    EXPECT_EQ(6, event.vscp_type);
+    EXPECT_EQ(2026, event.year);
+    EXPECT_EQ(3, event.month);
+    EXPECT_EQ(12, event.day);
+    EXPECT_EQ(14, event.hour);
+    EXPECT_EQ(30, event.minute);
+    EXPECT_EQ(45, event.second);
+    EXPECT_EQ(123456789, event.timestamp);
+    EXPECT_EQ(42, event.obid);
+    EXPECT_EQ(2, event.sizeData);
+    ASSERT_NE(nullptr, event.pdata);
+    EXPECT_EQ(0xAA, event.pdata[0]);
+    EXPECT_EQ(0xBB, event.pdata[1]);
+    
+    for (int i = 0; i < 16; i++) {
+        EXPECT_EQ(0xCC, event.GUID[i]);
+    }
+    
+    vscp_deleteEvent(&event);
+}
+
+TEST(VscpHelper, eventExToEvent_UnixNsFrame)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    
+    // Set header with UNIX_NS frame version (0x0100)
+    eventEx.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS | 0x0007;  // priority bits
+    eventEx.vscp_class = 20;
+    eventEx.vscp_type = 10;
+    // Note: In vscpEventEx, timestamp_ns shares union with day/hour/minute/second/timestamp AND crc
+    eventEx.timestamp_ns = 1234567890123456789ULL;  // Unix nanoseconds
+    eventEx.obid = 99;
+    eventEx.sizeData = 4;
+    eventEx.data[0] = 0x11;
+    eventEx.data[1] = 0x22;
+    eventEx.data[2] = 0x33;
+    eventEx.data[3] = 0x44;
+    memset(eventEx.GUID, 0xDD, 16);
+    
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.pdata = nullptr;
+    
+    EXPECT_TRUE(vscp_convertEventExToEvent(&event, &eventEx));
+    
+    EXPECT_EQ(eventEx.head, event.head);
+    EXPECT_EQ(20, event.vscp_class);
+    EXPECT_EQ(10, event.vscp_type);
+    EXPECT_EQ(1234567890123456789ULL, event.timestamp_ns);
+    // For UNIX_NS frame, year should be 0xffff and month 0xff
+    EXPECT_EQ(0xffff, event.year);
+    EXPECT_EQ(0xff, event.month);
+    EXPECT_EQ(99, event.obid);
+    EXPECT_EQ(4, event.sizeData);
+    ASSERT_NE(nullptr, event.pdata);
+    EXPECT_EQ(0x11, event.pdata[0]);
+    EXPECT_EQ(0x22, event.pdata[1]);
+    EXPECT_EQ(0x33, event.pdata[2]);
+    EXPECT_EQ(0x44, event.pdata[3]);
+    
+    for (int i = 0; i < 16; i++) {
+        EXPECT_EQ(0xDD, event.GUID[i]);
+    }
     
     vscp_deleteEvent(&event);
 }
@@ -778,9 +1238,310 @@ TEST(VscpHelper, copyEventEx)
     EXPECT_EQ(3, eventTo.data[2]);
 }
 
+TEST(VscpHelper, copyEvent_OriginalFrame)
+{
+    vscpEvent eventFrom;
+    memset(&eventFrom, 0, sizeof(eventFrom));
+    
+    // Set header with ORIGINAL frame version (0x0000)
+    eventFrom.head = VSCP_HEADER16_FRAME_VERSION_ORIGINAL | 0x0005;  // priority bits
+    eventFrom.vscp_class = 10;
+    eventFrom.vscp_type = 6;
+    eventFrom.year = 2026;
+    eventFrom.month = 3;
+    eventFrom.day = 12;
+    eventFrom.hour = 14;
+    eventFrom.minute = 30;
+    eventFrom.second = 45;
+    eventFrom.timestamp = 123456789;
+    eventFrom.obid = 42;
+    eventFrom.sizeData = 3;
+    eventFrom.pdata = new uint8_t[3]{0xAA, 0xBB, 0xCC};
+    memset(eventFrom.GUID, 0xDD, 16);
+    
+    vscpEvent eventTo;
+    memset(&eventTo, 0, sizeof(eventTo));
+    eventTo.pdata = nullptr;
+    
+    EXPECT_TRUE(vscp_copyEvent(&eventTo, &eventFrom));
+    
+    EXPECT_EQ(eventFrom.head, eventTo.head);
+    EXPECT_EQ(10, eventTo.vscp_class);
+    EXPECT_EQ(6, eventTo.vscp_type);
+    EXPECT_EQ(2026, eventTo.year);
+    EXPECT_EQ(3, eventTo.month);
+    EXPECT_EQ(12, eventTo.day);
+    EXPECT_EQ(14, eventTo.hour);
+    EXPECT_EQ(30, eventTo.minute);
+    EXPECT_EQ(45, eventTo.second);
+    EXPECT_EQ(123456789, eventTo.timestamp);
+    EXPECT_EQ(42, eventTo.obid);
+    EXPECT_EQ(3, eventTo.sizeData);
+    ASSERT_NE(nullptr, eventTo.pdata);
+    EXPECT_EQ(0xAA, eventTo.pdata[0]);
+    EXPECT_EQ(0xBB, eventTo.pdata[1]);
+    EXPECT_EQ(0xCC, eventTo.pdata[2]);
+    
+    for (int i = 0; i < 16; i++) {
+        EXPECT_EQ(0xDD, eventTo.GUID[i]);
+    }
+    
+    delete[] eventFrom.pdata;
+    delete[] eventTo.pdata;
+}
+
+TEST(VscpHelper, copyEvent_UnixNsFrame)
+{
+    vscpEvent eventFrom;
+    memset(&eventFrom, 0, sizeof(eventFrom));
+    
+    // Set header with UNIX_NS frame version (0x0100)
+    eventFrom.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS | 0x0007;  // priority bits
+    eventFrom.vscp_class = 20;
+    eventFrom.vscp_type = 10;
+    eventFrom.year = 0xffff;  // Not used in UNIX_NS
+    eventFrom.month = 0xff;   // Not used in UNIX_NS
+    eventFrom.timestamp_ns = 1234567890123456789ULL;  // Unix nanoseconds
+    eventFrom.obid = 99;
+    eventFrom.sizeData = 4;
+    eventFrom.pdata = new uint8_t[4]{0x11, 0x22, 0x33, 0x44};
+    memset(eventFrom.GUID, 0xEE, 16);
+    
+    vscpEvent eventTo;
+    memset(&eventTo, 0, sizeof(eventTo));
+    eventTo.pdata = nullptr;
+    
+    EXPECT_TRUE(vscp_copyEvent(&eventTo, &eventFrom));
+    
+    EXPECT_EQ(eventFrom.head, eventTo.head);
+    EXPECT_EQ(20, eventTo.vscp_class);
+    EXPECT_EQ(10, eventTo.vscp_type);
+    EXPECT_EQ(1234567890123456789ULL, eventTo.timestamp_ns);
+    EXPECT_EQ(0xffff, eventTo.year);
+    EXPECT_EQ(0xff, eventTo.month);
+    EXPECT_EQ(99, eventTo.obid);
+    EXPECT_EQ(4, eventTo.sizeData);
+    ASSERT_NE(nullptr, eventTo.pdata);
+    EXPECT_EQ(0x11, eventTo.pdata[0]);
+    EXPECT_EQ(0x22, eventTo.pdata[1]);
+    EXPECT_EQ(0x33, eventTo.pdata[2]);
+    EXPECT_EQ(0x44, eventTo.pdata[3]);
+    
+    for (int i = 0; i < 16; i++) {
+        EXPECT_EQ(0xEE, eventTo.GUID[i]);
+    }
+    
+    delete[] eventFrom.pdata;
+    delete[] eventTo.pdata;
+}
+
+TEST(VscpHelper, copyEventEx_OriginalFrame)
+{
+    vscpEventEx eventFrom;
+    memset(&eventFrom, 0, sizeof(eventFrom));
+    
+    // Set header with ORIGINAL frame version (0x0000)
+    eventFrom.head = VSCP_HEADER16_FRAME_VERSION_ORIGINAL | 0x0003;  // priority bits
+    eventFrom.vscp_class = 10;
+    eventFrom.vscp_type = 6;
+    eventFrom.year = 2026;
+    eventFrom.month = 3;
+    // Note: In vscpEventEx, day/hour/minute/second/timestamp share union with timestamp_ns AND crc
+    eventFrom.day = 12;
+    eventFrom.hour = 14;
+    eventFrom.minute = 30;
+    eventFrom.second = 45;
+    eventFrom.timestamp = 123456789;
+    eventFrom.obid = 42;
+    eventFrom.sizeData = 3;
+    eventFrom.data[0] = 0xAA;
+    eventFrom.data[1] = 0xBB;
+    eventFrom.data[2] = 0xCC;
+    memset(eventFrom.GUID, 0xDD, 16);
+    
+    vscpEventEx eventTo;
+    memset(&eventTo, 0, sizeof(eventTo));
+    
+    EXPECT_TRUE(vscp_copyEventEx(&eventTo, &eventFrom));
+    
+    EXPECT_EQ(eventFrom.head, eventTo.head);
+    EXPECT_EQ(10, eventTo.vscp_class);
+    EXPECT_EQ(6, eventTo.vscp_type);
+    EXPECT_EQ(2026, eventTo.year);
+    EXPECT_EQ(3, eventTo.month);
+    EXPECT_EQ(12, eventTo.day);
+    EXPECT_EQ(14, eventTo.hour);
+    EXPECT_EQ(30, eventTo.minute);
+    EXPECT_EQ(45, eventTo.second);
+    EXPECT_EQ(123456789, eventTo.timestamp);
+    EXPECT_EQ(42, eventTo.obid);
+    EXPECT_EQ(3, eventTo.sizeData);
+    EXPECT_EQ(0xAA, eventTo.data[0]);
+    EXPECT_EQ(0xBB, eventTo.data[1]);
+    EXPECT_EQ(0xCC, eventTo.data[2]);
+    
+    for (int i = 0; i < 16; i++) {
+        EXPECT_EQ(0xDD, eventTo.GUID[i]);
+    }
+}
+
+TEST(VscpHelper, copyEventEx_UnixNsFrame)
+{
+    vscpEventEx eventFrom;
+    memset(&eventFrom, 0, sizeof(eventFrom));
+    
+    // Set header with UNIX_NS frame version (0x0100)
+    eventFrom.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS | 0x0007;  // priority bits
+    eventFrom.vscp_class = 20;
+    eventFrom.vscp_type = 10;
+    // Note: In vscpEventEx, timestamp_ns shares union with day/hour/minute/second/timestamp AND crc
+    eventFrom.timestamp_ns = 1234567890123456789ULL;  // Unix nanoseconds
+    eventFrom.obid = 99;
+    eventFrom.sizeData = 4;
+    eventFrom.data[0] = 0x11;
+    eventFrom.data[1] = 0x22;
+    eventFrom.data[2] = 0x33;
+    eventFrom.data[3] = 0x44;
+    memset(eventFrom.GUID, 0xEE, 16);
+    
+    vscpEventEx eventTo;
+    memset(&eventTo, 0, sizeof(eventTo));
+    
+    EXPECT_TRUE(vscp_copyEventEx(&eventTo, &eventFrom));
+    
+    EXPECT_EQ(eventFrom.head, eventTo.head);
+    EXPECT_EQ(20, eventTo.vscp_class);
+    EXPECT_EQ(10, eventTo.vscp_type);
+    EXPECT_EQ(1234567890123456789ULL, eventTo.timestamp_ns);
+    EXPECT_EQ(99, eventTo.obid);
+    EXPECT_EQ(4, eventTo.sizeData);
+    EXPECT_EQ(0x11, eventTo.data[0]);
+    EXPECT_EQ(0x22, eventTo.data[1]);
+    EXPECT_EQ(0x33, eventTo.data[2]);
+    EXPECT_EQ(0x44, eventTo.data[3]);
+    
+    for (int i = 0; i < 16; i++) {
+        EXPECT_EQ(0xEE, eventTo.GUID[i]);
+    }
+}
+
 // =============================================================================
 //                         Event String Conversion
 // =============================================================================
+
+TEST(VscpHelper, getDateStringFromEvent_OriginalFrame)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    
+    // Set header with ORIGINAL frame version (0x0000)
+    event.head = VSCP_HEADER16_FRAME_VERSION_ORIGINAL;
+    event.year = 2026;
+    event.month = 3;
+    event.day = 12;
+    event.hour = 14;
+    event.minute = 30;
+    event.second = 45;
+    
+    std::string dt;
+    EXPECT_TRUE(vscp_getDateStringFromEvent(dt, &event));
+    EXPECT_EQ("2026-03-12T14:30:45Z", dt);
+}
+
+TEST(VscpHelper, getDateStringFromEvent_UnixNsFrame)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    
+    // Set header with UNIX_NS frame version (0x0100)
+    event.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
+    // 2026-03-12T14:30:45.123456789Z in nanoseconds since epoch
+    // Using a known timestamp: 1773509445123456789 (approx 2026-03-12)
+    event.timestamp_ns = 1773509445123456789ULL;
+    
+    std::string dt;
+    EXPECT_TRUE(vscp_getDateStringFromEvent(dt, &event));
+    // Should contain nanoseconds
+    EXPECT_FALSE(dt.empty());
+    EXPECT_NE(std::string::npos, dt.find("."));  // Should have decimal point for nanos
+    EXPECT_NE(std::string::npos, dt.find("2026"));  // Should be year 2026
+}
+
+TEST(VscpHelper, getDateStringFromEvent_OriginalFrame_Empty)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    
+    // Set header with ORIGINAL frame version (0x0000) but all zeros
+    event.head = VSCP_HEADER16_FRAME_VERSION_ORIGINAL;
+    event.year = 0;
+    event.month = 0;
+    event.day = 0;
+    event.hour = 0;
+    event.minute = 0;
+    event.second = 0;
+    
+    std::string dt;
+    EXPECT_TRUE(vscp_getDateStringFromEvent(dt, &event));
+    EXPECT_TRUE(dt.empty());  // Should return empty string when all zeros
+}
+
+TEST(VscpHelper, getDateStringFromEventEx_OriginalFrame)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    
+    // Set header with ORIGINAL frame version (0x0000)
+    eventEx.head = VSCP_HEADER16_FRAME_VERSION_ORIGINAL;
+    eventEx.year = 2026;
+    eventEx.month = 3;
+    eventEx.day = 12;
+    eventEx.hour = 14;
+    eventEx.minute = 30;
+    eventEx.second = 45;
+    
+    std::string dt;
+    EXPECT_TRUE(vscp_getDateStringFromEventEx(dt, &eventEx));
+    EXPECT_EQ("2026-03-12T14:30:45Z", dt);
+}
+
+TEST(VscpHelper, getDateStringFromEventEx_UnixNsFrame)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    
+    // Set header with UNIX_NS frame version (0x0100)
+    eventEx.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
+    // Using a known timestamp (approx 2026-03-12)
+    eventEx.timestamp_ns = 1773509445123456789ULL;
+    
+    std::string dt;
+    EXPECT_TRUE(vscp_getDateStringFromEventEx(dt, &eventEx));
+    // Should contain nanoseconds
+    EXPECT_FALSE(dt.empty());
+    EXPECT_NE(std::string::npos, dt.find("."));  // Should have decimal point for nanos
+    EXPECT_NE(std::string::npos, dt.find("2026"));  // Should be year 2026
+}
+
+TEST(VscpHelper, getDateStringFromEventEx_OriginalFrame_Empty)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    
+    // Set header with ORIGINAL frame version (0x0000) but all zeros
+    eventEx.head = VSCP_HEADER16_FRAME_VERSION_ORIGINAL;
+    eventEx.year = 0;
+    eventEx.month = 0;
+    // Note: day/hour/minute/second share union with timestamp_ns
+    eventEx.day = 0;
+    eventEx.hour = 0;
+    eventEx.minute = 0;
+    eventEx.second = 0;
+    
+    std::string dt;
+    EXPECT_TRUE(vscp_getDateStringFromEventEx(dt, &eventEx));
+    EXPECT_TRUE(dt.empty());  // Should return empty string when all zeros
+}
 
 TEST(VscpHelper, convertEventToString)
 {
@@ -854,6 +1615,366 @@ TEST(VscpHelper, convertStringToEventEx)
     EXPECT_EQ(1, eventEx.data[0]);
     EXPECT_EQ(2, eventEx.data[1]);
     EXPECT_EQ(3, eventEx.data[2]);
+}
+
+TEST(VscpHelper, convertEventToJSON_OriginalFrame)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    
+    event.head = VSCP_HEADER16_FRAME_VERSION_ORIGINAL | 0x0003;
+    event.vscp_class = 10;
+    event.vscp_type = 6;
+    event.obid = 42;
+    event.year = 2026;
+    event.month = 3;
+    event.day = 12;
+    event.hour = 14;
+    event.minute = 30;
+    event.second = 45;
+    event.timestamp = 123456789;
+    memset(event.GUID, 0xAA, 16);
+    event.sizeData = 2;
+    event.pdata = new uint8_t[2]{0x11, 0x22};
+    
+    std::string strJSON;
+    EXPECT_TRUE(vscp_convertEventToJSON(strJSON, &event));
+    EXPECT_FALSE(strJSON.empty());
+    
+    // Should contain 32-bit timestamp value
+    EXPECT_NE(std::string::npos, strJSON.find("\"timestamp\": 123456789"));
+    EXPECT_NE(std::string::npos, strJSON.find("\"class\": 10"));
+    EXPECT_NE(std::string::npos, strJSON.find("\"type\": 6"));
+    
+    delete[] event.pdata;
+}
+
+TEST(VscpHelper, convertEventToJSON_UnixNsFrame)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    
+    event.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS | 0x0007;
+    event.vscp_class = 20;
+    event.vscp_type = 10;
+    event.obid = 99;
+    event.timestamp_ns = 1234567890123456789ULL;
+    memset(event.GUID, 0xBB, 16);
+    event.sizeData = 3;
+    event.pdata = new uint8_t[3]{0x33, 0x44, 0x55};
+    
+    std::string strJSON;
+    EXPECT_TRUE(vscp_convertEventToJSON(strJSON, &event));
+    EXPECT_FALSE(strJSON.empty());
+    
+    // Should contain 64-bit nanosecond timestamp value
+    EXPECT_NE(std::string::npos, strJSON.find("\"timestamp\": 1234567890123456789"));
+    EXPECT_NE(std::string::npos, strJSON.find("\"class\": 20"));
+    EXPECT_NE(std::string::npos, strJSON.find("\"type\": 10"));
+    
+    delete[] event.pdata;
+}
+
+TEST(VscpHelper, convertEventExToJSON_OriginalFrame)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    
+    eventEx.head = VSCP_HEADER16_FRAME_VERSION_ORIGINAL | 0x0003;
+    eventEx.vscp_class = 10;
+    eventEx.vscp_type = 6;
+    eventEx.obid = 42;
+    eventEx.year = 2026;
+    eventEx.month = 3;
+    eventEx.day = 12;
+    eventEx.hour = 14;
+    eventEx.minute = 30;
+    eventEx.second = 45;
+    eventEx.timestamp = 123456789;
+    memset(eventEx.GUID, 0xAA, 16);
+    eventEx.sizeData = 2;
+    eventEx.data[0] = 0x11;
+    eventEx.data[1] = 0x22;
+    
+    std::string strJSON;
+    EXPECT_TRUE(vscp_convertEventExToJSON(strJSON, &eventEx));
+    EXPECT_FALSE(strJSON.empty());
+    
+    // Should contain 32-bit timestamp value
+    EXPECT_NE(std::string::npos, strJSON.find("\"timestamp\": 123456789"));
+    EXPECT_NE(std::string::npos, strJSON.find("\"class\": 10"));
+    EXPECT_NE(std::string::npos, strJSON.find("\"type\": 6"));
+}
+
+TEST(VscpHelper, convertEventExToJSON_UnixNsFrame)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    
+    eventEx.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS | 0x0007;
+    eventEx.vscp_class = 20;
+    eventEx.vscp_type = 10;
+    eventEx.obid = 99;
+    eventEx.timestamp_ns = 1234567890123456789ULL;
+    memset(eventEx.GUID, 0xBB, 16);
+    eventEx.sizeData = 3;
+    eventEx.data[0] = 0x33;
+    eventEx.data[1] = 0x44;
+    eventEx.data[2] = 0x55;
+    
+    std::string strJSON;
+    EXPECT_TRUE(vscp_convertEventExToJSON(strJSON, &eventEx));
+    EXPECT_FALSE(strJSON.empty());
+    
+    // Should contain 64-bit nanosecond timestamp value
+    EXPECT_NE(std::string::npos, strJSON.find("\"timestamp\": 1234567890123456789"));
+    EXPECT_NE(std::string::npos, strJSON.find("\"class\": 20"));
+    EXPECT_NE(std::string::npos, strJSON.find("\"type\": 10"));
+}
+
+TEST(VscpHelper, convertJSONToEvent_OriginalFrame)
+{
+    std::string strJSON = R"({
+        "head": 3,
+        "obid": 42,
+        "datetime": "2026-03-12T14:30:45Z",
+        "timestamp": 123456789,
+        "class": 10,
+        "type": 6,
+        "guid": "AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA",
+        "data": [17, 34]
+    })";
+    
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.pdata = nullptr;
+    
+    EXPECT_TRUE(vscp_convertJSONToEvent(&event, strJSON));
+    
+    // ORIGINAL frame version (0x0000) with priority bits
+    EXPECT_EQ(3, event.head);
+    EXPECT_EQ(42, event.obid);
+    EXPECT_EQ(123456789, event.timestamp);
+    EXPECT_EQ(10, event.vscp_class);
+    EXPECT_EQ(6, event.vscp_type);
+    EXPECT_EQ(2, event.sizeData);
+    ASSERT_NE(nullptr, event.pdata);
+    EXPECT_EQ(0x11, event.pdata[0]);
+    EXPECT_EQ(0x22, event.pdata[1]);
+    
+    vscp_deleteEvent(&event);
+}
+
+TEST(VscpHelper, convertJSONToEvent_UnixNsFrame)
+{
+    // Head 0x0107 = VSCP_HEADER16_FRAME_VERSION_UNIX_NS (0x0100) | priority bits (0x0007)
+    std::string strJSON = R"({
+        "head": 263,
+        "obid": 99,
+        "timestamp": 1234567890123456789,
+        "class": 20,
+        "type": 10,
+        "guid": "BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB",
+        "data": [51, 68, 85]
+    })";
+    
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.pdata = nullptr;
+    
+    EXPECT_TRUE(vscp_convertJSONToEvent(&event, strJSON));
+    
+    // UNIX_NS frame version (0x0100) = 256 + priority 7 = 263
+    EXPECT_EQ(263, event.head);
+    EXPECT_EQ(99, event.obid);
+    EXPECT_EQ(1234567890123456789ULL, event.timestamp_ns);
+    EXPECT_EQ(0xffff, event.year);  // Should be set to 0xffff for UNIX_NS
+    EXPECT_EQ(0xff, event.month);   // Should be set to 0xff for UNIX_NS
+    EXPECT_EQ(20, event.vscp_class);
+    EXPECT_EQ(10, event.vscp_type);
+    EXPECT_EQ(3, event.sizeData);
+    ASSERT_NE(nullptr, event.pdata);
+    EXPECT_EQ(0x33, event.pdata[0]);
+    EXPECT_EQ(0x44, event.pdata[1]);
+    EXPECT_EQ(0x55, event.pdata[2]);
+    
+    vscp_deleteEvent(&event);
+}
+
+TEST(VscpHelper, convertJSONToEventEx_OriginalFrame)
+{
+    std::string strJSON = R"({
+        "head": 3,
+        "obid": 42,
+        "datetime": "2026-03-12T14:30:45Z",
+        "timestamp": 123456789,
+        "class": 10,
+        "type": 6,
+        "guid": "AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA",
+        "data": [17, 34]
+    })";
+    
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    
+    EXPECT_TRUE(vscp_convertJSONToEventEx(&eventEx, strJSON));
+    
+    // ORIGINAL frame version (0x0000) with priority bits
+    EXPECT_EQ(3, eventEx.head);
+    EXPECT_EQ(42, eventEx.obid);
+    EXPECT_EQ(123456789, eventEx.timestamp);
+    EXPECT_EQ(10, eventEx.vscp_class);
+    EXPECT_EQ(6, eventEx.vscp_type);
+    EXPECT_EQ(2, eventEx.sizeData);
+    EXPECT_EQ(0x11, eventEx.data[0]);
+    EXPECT_EQ(0x22, eventEx.data[1]);
+}
+
+TEST(VscpHelper, convertJSONToEventEx_UnixNsFrame)
+{
+    // Head 0x0107 = VSCP_HEADER16_FRAME_VERSION_UNIX_NS (0x0100) | priority bits (0x0007)
+    std::string strJSON = R"({
+        "head": 263,
+        "obid": 99,
+        "timestamp": 1234567890123456789,
+        "class": 20,
+        "type": 10,
+        "guid": "BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB:BB",
+        "data": [51, 68, 85]
+    })";
+    
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    
+    EXPECT_TRUE(vscp_convertJSONToEventEx(&eventEx, strJSON));
+    
+    // UNIX_NS frame version (0x0100) = 256 + priority 7 = 263
+    EXPECT_EQ(263, eventEx.head);
+    EXPECT_EQ(99, eventEx.obid);
+    EXPECT_EQ(1234567890123456789ULL, eventEx.timestamp_ns);
+    EXPECT_EQ(0xffff, eventEx.year);  // Should be set to 0xffff for UNIX_NS
+    EXPECT_EQ(0xff, eventEx.month);   // Should be set to 0xff for UNIX_NS
+    EXPECT_EQ(20, eventEx.vscp_class);
+    EXPECT_EQ(10, eventEx.vscp_type);
+    EXPECT_EQ(3, eventEx.sizeData);
+    EXPECT_EQ(0x33, eventEx.data[0]);
+    EXPECT_EQ(0x44, eventEx.data[1]);
+    EXPECT_EQ(0x55, eventEx.data[2]);
+}
+
+TEST(VscpHelper, convertEventToXML_OriginalFrame)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    
+    event.head = VSCP_HEADER16_FRAME_VERSION_ORIGINAL | 0x0003;
+    event.vscp_class = 10;
+    event.vscp_type = 6;
+    event.obid = 42;
+    event.year = 2026;
+    event.month = 3;
+    event.day = 12;
+    event.hour = 14;
+    event.minute = 30;
+    event.second = 45;
+    event.timestamp = 123456789;
+    memset(event.GUID, 0xAA, 16);
+    event.sizeData = 2;
+    event.pdata = new uint8_t[2]{0x11, 0x22};
+    
+    std::string strXML;
+    EXPECT_TRUE(vscp_convertEventToXML(strXML, &event));
+    EXPECT_FALSE(strXML.empty());
+    
+    // Should contain 32-bit timestamp value
+    EXPECT_NE(std::string::npos, strXML.find("timestamp=\"123456789\""));
+    EXPECT_NE(std::string::npos, strXML.find("class=\"10\""));
+    EXPECT_NE(std::string::npos, strXML.find("type=\"6\""));
+    
+    delete[] event.pdata;
+}
+
+TEST(VscpHelper, convertEventToXML_UnixNsFrame)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    
+    event.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS | 0x0007;
+    event.vscp_class = 20;
+    event.vscp_type = 10;
+    event.obid = 99;
+    event.timestamp_ns = 1234567890123456789ULL;
+    memset(event.GUID, 0xBB, 16);
+    event.sizeData = 3;
+    event.pdata = new uint8_t[3]{0x33, 0x44, 0x55};
+    
+    std::string strXML;
+    EXPECT_TRUE(vscp_convertEventToXML(strXML, &event));
+    EXPECT_FALSE(strXML.empty());
+    
+    // Should contain 64-bit nanosecond timestamp value
+    EXPECT_NE(std::string::npos, strXML.find("timestamp=\"1234567890123456789\""));
+    EXPECT_NE(std::string::npos, strXML.find("class=\"20\""));
+    EXPECT_NE(std::string::npos, strXML.find("type=\"10\""));
+    
+    delete[] event.pdata;
+}
+
+TEST(VscpHelper, convertEventExToXML_OriginalFrame)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    
+    eventEx.head = VSCP_HEADER16_FRAME_VERSION_ORIGINAL | 0x0003;
+    eventEx.vscp_class = 10;
+    eventEx.vscp_type = 6;
+    eventEx.obid = 42;
+    eventEx.year = 2026;
+    eventEx.month = 3;
+    eventEx.day = 12;
+    eventEx.hour = 14;
+    eventEx.minute = 30;
+    eventEx.second = 45;
+    eventEx.timestamp = 123456789;
+    memset(eventEx.GUID, 0xAA, 16);
+    eventEx.sizeData = 2;
+    eventEx.data[0] = 0x11;
+    eventEx.data[1] = 0x22;
+    
+    std::string strXML;
+    EXPECT_TRUE(vscp_convertEventExToXML(strXML, &eventEx));
+    EXPECT_FALSE(strXML.empty());
+    
+    // Should contain 32-bit timestamp value
+    EXPECT_NE(std::string::npos, strXML.find("timestamp=\"123456789\""));
+    EXPECT_NE(std::string::npos, strXML.find("class=\"10\""));
+    EXPECT_NE(std::string::npos, strXML.find("type=\"6\""));
+}
+
+TEST(VscpHelper, convertEventExToXML_UnixNsFrame)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    
+    eventEx.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS | 0x0007;
+    eventEx.vscp_class = 20;
+    eventEx.vscp_type = 10;
+    eventEx.obid = 99;
+    eventEx.timestamp_ns = 1234567890123456789ULL;
+    memset(eventEx.GUID, 0xBB, 16);
+    eventEx.sizeData = 3;
+    eventEx.data[0] = 0x33;
+    eventEx.data[1] = 0x44;
+    eventEx.data[2] = 0x55;
+    
+    std::string strXML;
+    EXPECT_TRUE(vscp_convertEventExToXML(strXML, &eventEx));
+    EXPECT_FALSE(strXML.empty());
+    
+    // Should contain 64-bit nanosecond timestamp value
+    EXPECT_NE(std::string::npos, strXML.find("timestamp=\"1234567890123456789\""));
+    EXPECT_NE(std::string::npos, strXML.find("class=\"20\""));
+    EXPECT_NE(std::string::npos, strXML.find("type=\"10\""));
 }
 
 // =============================================================================
@@ -1155,6 +2276,998 @@ TEST(VscpHelper, calc_crc_EventEx)
     
     // CRC should be consistent
     EXPECT_EQ(crc1, crc2);
+}
+
+// =============================================================================
+//                         XML Parsing Tests for Frame Types
+// =============================================================================
+
+TEST(VscpHelper, convertXMLToEvent_OriginalFrame)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    
+    // XML with ORIGINAL frame (head=0) and 32-bit timestamp
+    std::string xml = "<event head=\"0\" obid=\"123\" datetime=\"2024-01-15T10:30:00Z\" "
+                      "timestamp=\"50817\" class=\"10\" type=\"8\" "
+                      "guid=\"00:00:00:00:00:00:00:00:00:00:00:00:00:01:00:02\" "
+                      "data=\"1,2,3,4,5\" />";
+    
+    EXPECT_TRUE(vscp_convertXMLToEvent(&event, xml));
+    EXPECT_EQ(0, event.head);
+    EXPECT_EQ(123u, event.obid);
+    EXPECT_EQ(50817u, event.timestamp);
+    EXPECT_EQ(10, event.vscp_class);
+    EXPECT_EQ(8, event.vscp_type);
+    EXPECT_EQ(5, event.sizeData);
+    EXPECT_EQ(0x02, event.GUID[15]);
+    
+    if (event.pdata) {
+        delete[] event.pdata;
+    }
+}
+
+TEST(VscpHelper, convertXMLToEvent_UnixNsFrame)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    
+    // XML with UNIX_NS frame (head=0x100) and 64-bit timestamp
+    std::string xml = "<event head=\"256\" obid=\"123\" datetime=\"2024-01-15T10:30:00.123456789Z\" "
+                      "timestamp=\"1705315800123456789\" class=\"10\" type=\"8\" "
+                      "guid=\"00:00:00:00:00:00:00:00:00:00:00:00:00:01:00:02\" "
+                      "data=\"1,2,3,4,5\" />";
+    
+    EXPECT_TRUE(vscp_convertXMLToEvent(&event, xml));
+    EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_UNIX_NS, event.head & VSCP_HEADER16_FRAME_VERSION_MASK);
+    EXPECT_EQ(123u, event.obid);
+    EXPECT_EQ(1705315800123456789ULL, event.timestamp_ns);
+    EXPECT_EQ(10, event.vscp_class);
+    EXPECT_EQ(8, event.vscp_type);
+    EXPECT_EQ(0xffff, event.year);
+    EXPECT_EQ(0xff, event.month);
+    
+    if (event.pdata) {
+        delete[] event.pdata;
+    }
+}
+
+TEST(VscpHelper, convertXMLToEventEx_OriginalFrame)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    
+    // XML with ORIGINAL frame (head=0) and 32-bit timestamp
+    std::string xml = "<event head=\"0\" obid=\"123\" datetime=\"2024-01-15T10:30:00Z\" "
+                      "timestamp=\"50817\" class=\"10\" type=\"8\" "
+                      "guid=\"00:00:00:00:00:00:00:00:00:00:00:00:00:01:00:02\" "
+                      "data=\"1,2,3,4,5\" />";
+    
+    EXPECT_TRUE(vscp_convertXMLToEventEx(&eventEx, xml));
+    EXPECT_EQ(0, eventEx.head);
+    EXPECT_EQ(123u, eventEx.obid);
+    EXPECT_EQ(50817u, eventEx.timestamp);
+    EXPECT_EQ(10, eventEx.vscp_class);
+    EXPECT_EQ(8, eventEx.vscp_type);
+    EXPECT_EQ(5, eventEx.sizeData);
+    // GUID parsing validated in other tests
+}
+
+TEST(VscpHelper, convertXMLToEventEx_UnixNsFrame)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    
+    // XML with UNIX_NS frame (head=0x100) and 64-bit timestamp
+    std::string xml = "<event head=\"256\" obid=\"123\" datetime=\"2024-01-15T10:30:00.123456789Z\" "
+                      "timestamp=\"1705315800123456789\" class=\"10\" type=\"8\" "
+                      "guid=\"00:00:00:00:00:00:00:00:00:00:00:00:00:01:00:02\" "
+                      "data=\"1,2,3,4,5\" />";
+    
+    EXPECT_TRUE(vscp_convertXMLToEventEx(&eventEx, xml));
+    EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_UNIX_NS, eventEx.head & VSCP_HEADER16_FRAME_VERSION_MASK);
+    EXPECT_EQ(123u, eventEx.obid);
+    EXPECT_EQ(1705315800123456789ULL, eventEx.timestamp_ns);
+    EXPECT_EQ(10, eventEx.vscp_class);
+    EXPECT_EQ(8, eventEx.vscp_type);
+    EXPECT_EQ(0xffff, eventEx.year);
+    EXPECT_EQ(0xff, eventEx.month);
+}
+
+// =============================================================================
+//                         HTML Conversion Tests for Frame Types
+// =============================================================================
+
+TEST(VscpHelper, convertEventToHTML_OriginalFrame)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.head = 0;  // ORIGINAL frame
+    event.vscp_class = 10;
+    event.vscp_type = 8;
+    event.timestamp = 50817;
+    event.obid = 123;
+    event.sizeData = 3;
+    event.pdata = new uint8_t[3]{1, 2, 3};
+    memset(event.GUID, 0, 16);
+    event.GUID[13] = 0x01;
+    event.GUID[15] = 0x02;
+    
+    std::string html;
+    EXPECT_TRUE(vscp_convertEventToHTML(html, &event));
+    
+    // Verify 32-bit timestamp is in output
+    EXPECT_NE(std::string::npos, html.find("timestamp: 50817"));
+    EXPECT_NE(std::string::npos, html.find("class: 10"));
+    EXPECT_NE(std::string::npos, html.find("type: 8"));
+    
+    delete[] event.pdata;
+}
+
+TEST(VscpHelper, convertEventToHTML_UnixNsFrame)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS;  // UNIX_NS frame
+    event.vscp_class = 10;
+    event.vscp_type = 8;
+    event.timestamp_ns = 1705315800123456789ULL;
+    event.year = 0xffff;
+    event.month = 0xff;
+    event.obid = 123;
+    event.sizeData = 3;
+    event.pdata = new uint8_t[3]{1, 2, 3};
+    memset(event.GUID, 0, 16);
+    event.GUID[13] = 0x01;
+    event.GUID[15] = 0x02;
+    
+    std::string html;
+    EXPECT_TRUE(vscp_convertEventToHTML(html, &event));
+    
+    // Verify 64-bit timestamp is in output
+    EXPECT_NE(std::string::npos, html.find("timestamp: 1705315800123456789"));
+    EXPECT_NE(std::string::npos, html.find("class: 10"));
+    EXPECT_NE(std::string::npos, html.find("type: 8"));
+    
+    delete[] event.pdata;
+}
+
+TEST(VscpHelper, convertEventExToHTML_OriginalFrame)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    eventEx.head = 0;  // ORIGINAL frame
+    eventEx.vscp_class = 10;
+    eventEx.vscp_type = 8;
+    eventEx.timestamp = 50817;
+    eventEx.obid = 123;
+    eventEx.sizeData = 3;
+    eventEx.data[0] = 1;
+    eventEx.data[1] = 2;
+    eventEx.data[2] = 3;
+    memset(eventEx.GUID, 0, 16);
+    eventEx.GUID[13] = 0x01;
+    eventEx.GUID[15] = 0x02;
+    
+    std::string html;
+    EXPECT_TRUE(vscp_convertEventExToHTML(html, &eventEx));
+    
+    // Verify 32-bit timestamp is in output
+    EXPECT_NE(std::string::npos, html.find("timestamp: 50817"));
+    EXPECT_NE(std::string::npos, html.find("class: 10"));
+    EXPECT_NE(std::string::npos, html.find("type: 8"));
+}
+
+TEST(VscpHelper, convertEventExToHTML_UnixNsFrame)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    eventEx.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS;  // UNIX_NS frame
+    eventEx.vscp_class = 10;
+    eventEx.vscp_type = 8;
+    eventEx.timestamp_ns = 1705315800123456789ULL;
+    eventEx.year = 0xffff;
+    eventEx.month = 0xff;
+    eventEx.obid = 123;
+    eventEx.sizeData = 3;
+    eventEx.data[0] = 1;
+    eventEx.data[1] = 2;
+    eventEx.data[2] = 3;
+    memset(eventEx.GUID, 0, 16);
+    eventEx.GUID[13] = 0x01;
+    eventEx.GUID[15] = 0x02;
+    
+    std::string html;
+    EXPECT_TRUE(vscp_convertEventExToHTML(html, &eventEx));
+    
+    // Verify 64-bit timestamp is in output
+    EXPECT_NE(std::string::npos, html.find("timestamp: 1705315800123456789"));
+    EXPECT_NE(std::string::npos, html.find("class: 10"));
+    EXPECT_NE(std::string::npos, html.find("type: 8"));
+}
+
+// =============================================================================
+//                         setEventDateTime Tests for Frame Types
+// =============================================================================
+
+TEST(VscpHelper, setEventDateTime_OriginalFrame)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.head = 0;  // ORIGINAL frame
+    
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+    tm.tm_year = 2024 - 1900;  // Year since 1900
+    tm.tm_mon = 0;              // January (0-based)
+    tm.tm_mday = 15;
+    tm.tm_hour = 10;
+    tm.tm_min = 30;
+    tm.tm_sec = 45;
+    
+    EXPECT_TRUE(vscp_setEventDateTime(&event, &tm));
+    
+    // Verify individual fields are set
+    EXPECT_EQ(2024, event.year);
+    EXPECT_EQ(1, event.month);
+    EXPECT_EQ(15, event.day);
+    EXPECT_EQ(10, event.hour);
+    EXPECT_EQ(30, event.minute);
+    EXPECT_EQ(45, event.second);
+}
+
+TEST(VscpHelper, setEventDateTime_UnixNsFrame)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS;  // UNIX_NS frame
+    
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+    tm.tm_year = 2024 - 1900;  // Year since 1900
+    tm.tm_mon = 0;              // January (0-based)
+    tm.tm_mday = 15;
+    tm.tm_hour = 10;
+    tm.tm_min = 30;
+    tm.tm_sec = 0;
+    
+    // Compute expected value the same way the function does
+    time_t expected_time = timegm(&tm);
+    uint64_t expected_ns = (uint64_t)expected_time * 1000000000ULL;
+    
+    EXPECT_TRUE(vscp_setEventDateTime(&event, &tm));
+    
+    // Verify timestamp_ns is set correctly
+    EXPECT_EQ(expected_ns, event.timestamp_ns);
+    EXPECT_EQ(0xffff, event.year);
+    EXPECT_EQ(0xff, event.month);
+}
+
+TEST(VscpHelper, setEventExDateTime_OriginalFrame)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    eventEx.head = 0;  // ORIGINAL frame
+    
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+    tm.tm_year = 2024 - 1900;  // Year since 1900
+    tm.tm_mon = 0;              // January (0-based)
+    tm.tm_mday = 15;
+    tm.tm_hour = 10;
+    tm.tm_min = 30;
+    tm.tm_sec = 45;
+    
+    EXPECT_TRUE(vscp_setEventExDateTime(&eventEx, &tm));
+    
+    // Verify individual fields are set
+    EXPECT_EQ(2024, eventEx.year);
+    EXPECT_EQ(1, eventEx.month);
+    EXPECT_EQ(15, eventEx.day);
+    EXPECT_EQ(10, eventEx.hour);
+    EXPECT_EQ(30, eventEx.minute);
+    EXPECT_EQ(45, eventEx.second);
+}
+
+TEST(VscpHelper, setEventExDateTime_UnixNsFrame)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    eventEx.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS;  // UNIX_NS frame
+    
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+    tm.tm_year = 2024 - 1900;  // Year since 1900
+    tm.tm_mon = 0;              // January (0-based)
+    tm.tm_mday = 15;
+    tm.tm_hour = 10;
+    tm.tm_min = 30;
+    tm.tm_sec = 0;
+    
+    // Compute expected value the same way the function does
+    time_t expected_time = timegm(&tm);
+    uint64_t expected_ns = (uint64_t)expected_time * 1000000000ULL;
+    
+    EXPECT_TRUE(vscp_setEventExDateTime(&eventEx, &tm));
+    
+    // Verify timestamp_ns is set correctly
+    EXPECT_EQ(expected_ns, eventEx.timestamp_ns);
+    EXPECT_EQ(0xffff, eventEx.year);
+    EXPECT_EQ(0xff, eventEx.month);
+}
+
+// =============================================================================
+//                    setEventDateTime Subsecond Precision Tests
+// =============================================================================
+
+TEST(VscpHelper, setEventDateTime_UnixNsFrame_WithSubsecond)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS;  // UNIX_NS frame
+    
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+    tm.tm_year = 2024 - 1900;  // Year since 1900
+    tm.tm_mon = 0;              // January (0-based)
+    tm.tm_mday = 15;
+    tm.tm_hour = 10;
+    tm.tm_min = 30;
+    tm.tm_sec = 0;
+    
+    uint32_t subsec_ns = 123456789;  // 123.456789 milliseconds
+    
+    // Compute expected value
+    time_t expected_time = timegm(&tm);
+    uint64_t expected_ns = (uint64_t)expected_time * 1000000000ULL + subsec_ns;
+    
+    EXPECT_TRUE(vscp_setEventDateTime(&event, &tm, subsec_ns));
+    
+    // Verify timestamp_ns includes subsecond precision
+    EXPECT_EQ(expected_ns, event.timestamp_ns);
+    EXPECT_EQ(0xffff, event.year);
+    EXPECT_EQ(0xff, event.month);
+}
+
+TEST(VscpHelper, setEventDateTime_OriginalFrame_SubsecondIgnored)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.head = 0;  // ORIGINAL frame
+    
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+    tm.tm_year = 2024 - 1900;
+    tm.tm_mon = 5;    // June
+    tm.tm_mday = 20;
+    tm.tm_hour = 14;
+    tm.tm_min = 45;
+    tm.tm_sec = 30;
+    
+    // Pass subsecond ns - should be ignored for ORIGINAL frame
+    EXPECT_TRUE(vscp_setEventDateTime(&event, &tm, 500000000));
+    
+    // Verify individual fields are set (subsecond ignored)
+    EXPECT_EQ(2024, event.year);
+    EXPECT_EQ(6, event.month);
+    EXPECT_EQ(20, event.day);
+    EXPECT_EQ(14, event.hour);
+    EXPECT_EQ(45, event.minute);
+    EXPECT_EQ(30, event.second);
+}
+
+TEST(VscpHelper, setEventDateTime_UnixNsFrame_NsClamped)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
+    
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+    tm.tm_year = 2024 - 1900;
+    tm.tm_mon = 0;
+    tm.tm_mday = 1;
+    tm.tm_hour = 0;
+    tm.tm_min = 0;
+    tm.tm_sec = 0;
+    
+    // Pass value > 999999999 - should be clamped
+    uint32_t too_large_ns = 2000000000;  // 2 billion - invalid
+    
+    time_t expected_time = timegm(&tm);
+    uint64_t expected_ns = (uint64_t)expected_time * 1000000000ULL + 999999999;  // Clamped value
+    
+    EXPECT_TRUE(vscp_setEventDateTime(&event, &tm, too_large_ns));
+    
+    // Verify ns was clamped to max valid value
+    EXPECT_EQ(expected_ns, event.timestamp_ns);
+}
+
+TEST(VscpHelper, setEventExDateTime_UnixNsFrame_WithSubsecond)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    eventEx.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
+    
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+    tm.tm_year = 2024 - 1900;
+    tm.tm_mon = 0;
+    tm.tm_mday = 15;
+    tm.tm_hour = 10;
+    tm.tm_min = 30;
+    tm.tm_sec = 0;
+    
+    uint32_t subsec_ns = 987654321;  // 987.654321 milliseconds
+    
+    time_t expected_time = timegm(&tm);
+    uint64_t expected_ns = (uint64_t)expected_time * 1000000000ULL + subsec_ns;
+    
+    EXPECT_TRUE(vscp_setEventExDateTime(&eventEx, &tm, subsec_ns));
+    
+    EXPECT_EQ(expected_ns, eventEx.timestamp_ns);
+    EXPECT_EQ(0xffff, eventEx.year);
+    EXPECT_EQ(0xff, eventEx.month);
+}
+
+TEST(VscpHelper, setEventExDateTime_OriginalFrame_SubsecondIgnored)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    eventEx.head = 0;  // ORIGINAL frame
+    
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+    tm.tm_year = 2024 - 1900;
+    tm.tm_mon = 11;   // December
+    tm.tm_mday = 31;
+    tm.tm_hour = 23;
+    tm.tm_min = 59;
+    tm.tm_sec = 59;
+    
+    // Pass subsecond ns - should be ignored for ORIGINAL frame
+    EXPECT_TRUE(vscp_setEventExDateTime(&eventEx, &tm, 999999999));
+    
+    // Verify individual fields are set (subsecond ignored)
+    EXPECT_EQ(2024, eventEx.year);
+    EXPECT_EQ(12, eventEx.month);
+    EXPECT_EQ(31, eventEx.day);
+    EXPECT_EQ(23, eventEx.hour);
+    EXPECT_EQ(59, eventEx.minute);
+    EXPECT_EQ(59, eventEx.second);
+}
+
+// =============================================================================
+//                    setEventToNow Tests for Frame Types
+// =============================================================================
+
+TEST(VscpHelper, setEventToNow_OriginalFrame)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.head = 0;  // ORIGINAL frame
+    
+    time_t before = time(nullptr);
+    EXPECT_TRUE(vscp_setEventToNow(&event));
+    time_t after = time(nullptr);
+    
+    // Verify year is reasonable (current year)
+    struct tm *now = gmtime(&before);
+    EXPECT_EQ(now->tm_year + 1900, event.year);
+    EXPECT_GE(event.month, 1);
+    EXPECT_LE(event.month, 12);
+    EXPECT_GE(event.day, 1);
+    EXPECT_LE(event.day, 31);
+}
+
+TEST(VscpHelper, setEventToNow_UnixNsFrame)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS;  // UNIX_NS frame
+    
+    time_t before = time(nullptr);
+    EXPECT_TRUE(vscp_setEventToNow(&event));
+    time_t after = time(nullptr);
+    
+    // Verify timestamp_ns is in reasonable range
+    uint64_t before_ns = (uint64_t)before * 1000000000ULL;
+    uint64_t after_ns = (uint64_t)after * 1000000000ULL;
+    
+    EXPECT_GE(event.timestamp_ns, before_ns);
+    EXPECT_LE(event.timestamp_ns, after_ns + 1000000000ULL);  // Allow 1 second margin
+    EXPECT_EQ(0xffff, event.year);
+    EXPECT_EQ(0xff, event.month);
+}
+
+TEST(VscpHelper, setEventExToNow_OriginalFrame)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    eventEx.head = 0;  // ORIGINAL frame
+    
+    time_t before = time(nullptr);
+    EXPECT_TRUE(vscp_setEventExToNow(&eventEx));
+    time_t after = time(nullptr);
+    
+    // Verify year is reasonable (current year)
+    struct tm *now = gmtime(&before);
+    EXPECT_EQ(now->tm_year + 1900, eventEx.year);
+    EXPECT_GE(eventEx.month, 1);
+    EXPECT_LE(eventEx.month, 12);
+    EXPECT_GE(eventEx.day, 1);
+    EXPECT_LE(eventEx.day, 31);
+}
+
+TEST(VscpHelper, setEventExToNow_UnixNsFrame)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    eventEx.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS;  // UNIX_NS frame
+    
+    time_t before = time(nullptr);
+    EXPECT_TRUE(vscp_setEventExToNow(&eventEx));
+    time_t after = time(nullptr);
+    
+    // Verify timestamp_ns is in reasonable range
+    uint64_t before_ns = (uint64_t)before * 1000000000ULL;
+    uint64_t after_ns = (uint64_t)after * 1000000000ULL;
+    
+    EXPECT_GE(eventEx.timestamp_ns, before_ns);
+    EXPECT_LE(eventEx.timestamp_ns, after_ns + 1000000000ULL);  // Allow 1 second margin
+    EXPECT_EQ(0xffff, eventEx.year);
+    EXPECT_EQ(0xff, eventEx.month);
+}
+
+// =============================================================================
+//                    convertCanalToEvent Tests
+// =============================================================================
+
+TEST(VscpHelper, convertCanalToEvent_SetsUnixNsFrameVersion)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    
+    canalMsg canalMsg;
+    memset(&canalMsg, 0, sizeof(canalMsg));
+    canalMsg.id = 0x0c0a0601;  // Class 10, Type 6, priority 3
+    canalMsg.sizeData = 3;
+    canalMsg.data[0] = 138;
+    canalMsg.data[1] = 0;
+    canalMsg.data[2] = 30;
+    canalMsg.timestamp = 12345;
+    
+    unsigned char guid[16] = {0};
+    guid[0] = 0xFF;
+    guid[1] = 0xFF;
+    
+    EXPECT_TRUE(vscp_convertCanalToEvent(&event, &canalMsg, guid));
+    
+    // Verify frame version is UNIX_NS
+    uint16_t frameVersion = event.head & VSCP_HEADER16_FRAME_VERSION_MASK;
+    EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_UNIX_NS, frameVersion);
+    
+    // Verify class and type extracted correctly
+    EXPECT_EQ(10, event.vscp_class);
+    EXPECT_EQ(6, event.vscp_type);
+    
+    // Verify data copied
+    EXPECT_EQ(3, event.sizeData);
+    EXPECT_EQ(138, event.pdata[0]);
+    EXPECT_EQ(0, event.pdata[1]);
+    EXPECT_EQ(30, event.pdata[2]);
+    
+    // Verify UNIX_NS frame fields are set
+    EXPECT_EQ(0xffff, event.year);
+    EXPECT_EQ(0xff, event.month);
+    
+    // Cleanup
+    if (event.pdata != nullptr) {
+        delete[] event.pdata;
+    }
+}
+
+// =============================================================================
+//                    setEventDateTimeBlockToNow Tests
+// =============================================================================
+
+TEST(VscpHelper, setEventDateTimeBlockToNow_OriginalFrame)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.head = 0;  // ORIGINAL frame
+    
+    time_t before = time(nullptr);
+    EXPECT_TRUE(vscp_setEventDateTimeBlockToNow(&event));
+    time_t after = time(nullptr);
+    
+    // Verify year is reasonable (current year)
+    struct tm *now = gmtime(&before);
+    EXPECT_EQ(now->tm_year + 1900, event.year);
+    EXPECT_GE(event.month, 1);
+    EXPECT_LE(event.month, 12);
+    EXPECT_GE(event.day, 1);
+    EXPECT_LE(event.day, 31);
+}
+
+TEST(VscpHelper, setEventDateTimeBlockToNow_UnixNsFrame)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS;  // UNIX_NS frame
+    
+    time_t before = time(nullptr);
+    EXPECT_TRUE(vscp_setEventDateTimeBlockToNow(&event));
+    time_t after = time(nullptr);
+    
+    // Verify timestamp_ns is in reasonable range
+    uint64_t before_ns = (uint64_t)before * 1000000000ULL;
+    uint64_t after_ns = (uint64_t)after * 1000000000ULL;
+    
+    EXPECT_GE(event.timestamp_ns, before_ns);
+    EXPECT_LE(event.timestamp_ns, after_ns + 1000000000ULL);  // Allow 1 second margin
+    EXPECT_EQ(0xffff, event.year);
+    EXPECT_EQ(0xff, event.month);
+}
+
+TEST(VscpHelper, setEventExDateTimeBlockToNow_OriginalFrame)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    eventEx.head = 0;  // ORIGINAL frame
+    
+    time_t before = time(nullptr);
+    EXPECT_TRUE(vscp_setEventExDateTimeBlockToNow(&eventEx));
+    time_t after = time(nullptr);
+    
+    // Verify year is reasonable (current year)
+    struct tm *now = gmtime(&before);
+    EXPECT_EQ(now->tm_year + 1900, eventEx.year);
+    EXPECT_GE(eventEx.month, 1);
+    EXPECT_LE(eventEx.month, 12);
+    EXPECT_GE(eventEx.day, 1);
+    EXPECT_LE(eventEx.day, 31);
+}
+
+TEST(VscpHelper, setEventExDateTimeBlockToNow_UnixNsFrame)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    eventEx.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS;  // UNIX_NS frame
+    
+    time_t before = time(nullptr);
+    EXPECT_TRUE(vscp_setEventExDateTimeBlockToNow(&eventEx));
+    time_t after = time(nullptr);
+    
+    // Verify timestamp_ns is in reasonable range
+    uint64_t before_ns = (uint64_t)before * 1000000000ULL;
+    uint64_t after_ns = (uint64_t)after * 1000000000ULL;
+    
+    EXPECT_GE(eventEx.timestamp_ns, before_ns);
+    EXPECT_LE(eventEx.timestamp_ns, after_ns + 1000000000ULL);  // Allow 1 second margin
+    EXPECT_EQ(0xffff, eventEx.year);
+    EXPECT_EQ(0xff, eventEx.month);
+}
+
+// =============================================================================
+//                    convertEventToString Tests for Frame Types
+// =============================================================================
+
+TEST(VscpHelper, convertEventToString_OriginalFrame)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.head = 0;  // ORIGINAL frame
+    event.vscp_class = 10;
+    event.vscp_type = 6;
+    event.obid = 123;
+    event.timestamp = 456789;
+    event.year = 2024;
+    event.month = 1;
+    event.day = 15;
+    event.hour = 10;
+    event.minute = 30;
+    event.second = 45;
+    memset(event.GUID, 0, 16);
+    event.GUID[0] = 0xFF;
+    event.GUID[15] = 0x01;
+    event.sizeData = 0;
+    event.pdata = nullptr;
+    
+    std::string str;
+    EXPECT_TRUE(vscp_convertEventToString(str, &event));
+    
+    // Verify string contains the 32-bit timestamp (456789)
+    EXPECT_NE(std::string::npos, str.find(",456789,"));
+    // Verify class and type
+    EXPECT_NE(std::string::npos, str.find(",10,6,"));
+}
+
+TEST(VscpHelper, convertEventToString_UnixNsFrame)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS;  // UNIX_NS frame
+    event.vscp_class = 10;
+    event.vscp_type = 6;
+    event.obid = 123;
+    event.timestamp_ns = 1705315845123456789ULL;  // Large 64-bit timestamp
+    event.year = 0xffff;
+    event.month = 0xff;
+    memset(event.GUID, 0, 16);
+    event.GUID[0] = 0xFF;
+    event.GUID[15] = 0x01;
+    event.sizeData = 0;
+    event.pdata = nullptr;
+    
+    std::string str;
+    EXPECT_TRUE(vscp_convertEventToString(str, &event));
+    
+    // Verify string contains the 64-bit timestamp
+    EXPECT_NE(std::string::npos, str.find(",1705315845123456789,"));
+    // Verify class and type
+    EXPECT_NE(std::string::npos, str.find(",10,6,"));
+}
+
+TEST(VscpHelper, convertEventExToString_UnixNsFrame)
+{
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    eventEx.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS;  // UNIX_NS frame
+    eventEx.vscp_class = 20;
+    eventEx.vscp_type = 3;
+    eventEx.obid = 456;
+    eventEx.timestamp_ns = 1705315845987654321ULL;
+    eventEx.year = 0xffff;
+    eventEx.month = 0xff;
+    memset(eventEx.GUID, 0, 16);
+    eventEx.sizeData = 0;
+    
+    std::string str;
+    EXPECT_TRUE(vscp_convertEventExToString(str, &eventEx));
+    
+    // Verify string contains the 64-bit timestamp
+    EXPECT_NE(std::string::npos, str.find(",1705315845987654321,"));
+    // Verify class and type
+    EXPECT_NE(std::string::npos, str.find(",20,3,"));
+}
+
+// Tests for vscp_convertStringToEvent producing UNIX_NS frame format
+
+TEST(VscpHelper, convertStringToEvent_SetsUnixNsFrameVersion)
+{
+    // Even if head is 0, the result should have UNIX_NS frame version
+    std::string str = "0,10,6,0,,0,00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00,0x01,0x02";
+    
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.pdata = nullptr;
+    
+    EXPECT_TRUE(vscp_convertStringToEvent(&event, str));
+    
+    // Verify UNIX_NS frame version is set
+    EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_UNIX_NS, event.head & VSCP_HEADER16_FRAME_VERSION_MASK);
+    // Verify year and month markers for UNIX_NS
+    EXPECT_EQ(0xffff, event.year);
+    EXPECT_EQ(0xff, event.month);
+    
+    vscp_deleteEvent(&event);
+}
+
+TEST(VscpHelper, convertStringToEvent_NsTimestampWhenDatetimeEmpty)
+{
+    // When datetime is empty, the timestamp field should be treated as nanoseconds
+    uint64_t expected_ns = 1705315845123456789ULL;
+    std::string str = "0,10,6,0,," + std::to_string(expected_ns) + ",00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00,0x01";
+    
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.pdata = nullptr;
+    
+    EXPECT_TRUE(vscp_convertStringToEvent(&event, str));
+    
+    // Verify timestamp_ns contains the nanosecond value
+    EXPECT_EQ(expected_ns, event.timestamp_ns);
+    EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_UNIX_NS, event.head & VSCP_HEADER16_FRAME_VERSION_MASK);
+    
+    vscp_deleteEvent(&event);
+}
+
+TEST(VscpHelper, convertStringToEvent_GeneratesTimestampWhenZero)
+{
+    // When datetime is empty and timestamp is 0, should generate current timestamp
+    std::string str = "0,10,6,0,,0,00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00,0x01";
+    
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.pdata = nullptr;
+    
+    uint64_t before = vscp_makeTimeStampNs();
+    EXPECT_TRUE(vscp_convertStringToEvent(&event, str));
+    uint64_t after = vscp_makeTimeStampNs();
+    
+    // Verify timestamp_ns is within reasonable range (now)
+    EXPECT_GE(event.timestamp_ns, before);
+    EXPECT_LE(event.timestamp_ns, after);
+    
+    vscp_deleteEvent(&event);
+}
+
+TEST(VscpHelper, convertStringToEvent_DatetimeParsedToNs)
+{
+    // When datetime is present, it should be converted to nanoseconds
+    // 2024-01-15T12:30:45
+    std::string str = "0,10,6,0,2024-01-15T12:30:45,0,00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00,0x01";
+    
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.pdata = nullptr;
+    
+    EXPECT_TRUE(vscp_convertStringToEvent(&event, str));
+    
+    // Verify it's a UNIX_NS frame
+    EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_UNIX_NS, event.head & VSCP_HEADER16_FRAME_VERSION_MASK);
+    // Verify timestamp_ns is reasonable (after year 2024)
+    EXPECT_GT(event.timestamp_ns, 1704067200000000000ULL);  // Jan 1, 2024 in ns
+    
+    vscp_deleteEvent(&event);
+}
+
+TEST(VscpHelper, convertStringToEventEx_SetsUnixNsFrameVersion)
+{
+    // Even if head is 0, the result should have UNIX_NS frame version
+    std::string str = "0,10,6,0,,0,00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00,0x01,0x02";
+    
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    
+    EXPECT_TRUE(vscp_convertStringToEventEx(&eventEx, str));
+    
+    // Verify UNIX_NS frame version is set
+    EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_UNIX_NS, eventEx.head & VSCP_HEADER16_FRAME_VERSION_MASK);
+    // Verify year and month markers for UNIX_NS
+    EXPECT_EQ(0xffff, eventEx.year);
+    EXPECT_EQ(0xff, eventEx.month);
+}
+
+TEST(VscpHelper, convertStringToEventEx_NsTimestampWhenDatetimeEmpty)
+{
+    // When datetime is empty, the timestamp field should be treated as nanoseconds
+    uint64_t expected_ns = 1705315845123456789ULL;
+    std::string str = "0,10,6,0,," + std::to_string(expected_ns) + ",00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00,0x01";
+    
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+    
+    EXPECT_TRUE(vscp_convertStringToEventEx(&eventEx, str));
+    
+    // Verify timestamp_ns contains the nanosecond value
+    EXPECT_EQ(expected_ns, eventEx.timestamp_ns);
+    EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_UNIX_NS, eventEx.head & VSCP_HEADER16_FRAME_VERSION_MASK);
+}
+
+// Tests for frame write/read with UNIX_NS format
+
+TEST(VscpHelper, writeEventToFrame_OriginalFormat)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.head = VSCP_HEADER16_FRAME_VERSION_ORIGINAL;  // Original frame
+    event.vscp_class = 10;
+    event.vscp_type = 6;
+    event.timestamp = 123456789;
+    event.year = 2024;
+    event.month = 1;
+    event.day = 15;
+    event.hour = 12;
+    event.minute = 30;
+    event.second = 45;
+    memset(event.GUID, 0xAA, 16);
+    event.sizeData = 2;
+    event.pdata = new uint8_t[2]{0x11, 0x22};
+    
+    uint8_t frame[128];
+    memset(frame, 0, sizeof(frame));
+    
+    EXPECT_TRUE(vscp_writeEventToFrame(frame, sizeof(frame), 0, &event));
+    
+    // Verify packet type byte has type 0 in upper nibble
+    EXPECT_EQ(0, GET_VSCP_MULTICAST_PACKET_TYPE(frame[0]));
+    
+    // Verify class/type positions for packet format 0
+    EXPECT_EQ(0, frame[VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_MSB]);
+    EXPECT_EQ(10, frame[VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_LSB]);
+    EXPECT_EQ(0, frame[VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_MSB]);
+    EXPECT_EQ(6, frame[VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_LSB]);
+    
+    delete[] event.pdata;
+}
+
+TEST(VscpHelper, writeEventToFrame_UnixNsFormat)
+{
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS;  // UNIX_NS frame
+    event.vscp_class = 20;
+    event.vscp_type = 3;
+    event.timestamp_ns = 1705315845123456789ULL;
+    event.year = 0xffff;
+    event.month = 0xff;
+    memset(event.GUID, 0xBB, 16);
+    event.sizeData = 2;
+    event.pdata = new uint8_t[2]{0x33, 0x44};
+    
+    uint8_t frame[128];
+    memset(frame, 0, sizeof(frame));
+    
+    EXPECT_TRUE(vscp_writeEventToFrame(frame, sizeof(frame), 0, &event));
+    
+    // Verify packet type byte has type 1 in upper nibble
+    EXPECT_EQ(VSCP_MULTICAST_TYPE_EVENT1, GET_VSCP_MULTICAST_PACKET_TYPE(frame[0]));
+    
+    // Verify class/type positions for packet format 1
+    EXPECT_EQ(0, frame[VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_MSB]);
+    EXPECT_EQ(20, frame[VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_LSB]);
+    EXPECT_EQ(0, frame[VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_MSB]);
+    EXPECT_EQ(3, frame[VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_LSB]);
+    
+    // Verify 8-byte nanosecond timestamp is written correctly
+    uint64_t readTs = ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP] << 56) |
+                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 1] << 48) |
+                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 2] << 40) |
+                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 3] << 32) |
+                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 4] << 24) |
+                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 5] << 16) |
+                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 6] << 8) |
+                      frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 7];
+    EXPECT_EQ(1705315845123456789ULL, readTs);
+    
+    delete[] event.pdata;
+}
+
+TEST(VscpHelper, getEventFromFrame_UnixNsFormat_RoundTrip)
+{
+    // Create an event with UNIX_NS format
+    vscpEvent eventOut;
+    memset(&eventOut, 0, sizeof(eventOut));
+    eventOut.head = VSCP_HEADER16_FRAME_VERSION_UNIX_NS | 0x0007;
+    eventOut.vscp_class = 100;
+    eventOut.vscp_type = 50;
+    eventOut.timestamp_ns = 1705315845987654321ULL;
+    eventOut.year = 0xffff;
+    eventOut.month = 0xff;
+    for (int i = 0; i < 16; i++) eventOut.GUID[i] = i;
+    eventOut.sizeData = 3;
+    eventOut.pdata = new uint8_t[3]{0xAA, 0xBB, 0xCC};
+    
+    // Write to frame
+    uint8_t frame[128];
+    memset(frame, 0, sizeof(frame));
+    EXPECT_TRUE(vscp_writeEventToFrame(frame, sizeof(frame), 0, &eventOut));
+    
+    // Read back from frame
+    vscpEvent eventIn;
+    memset(&eventIn, 0, sizeof(eventIn));
+    eventIn.pdata = nullptr;
+    EXPECT_TRUE(vscp_getEventFromFrame(&eventIn, frame, sizeof(frame)));
+    
+    // Verify round-trip
+    EXPECT_EQ(eventOut.head, eventIn.head);
+    EXPECT_EQ(eventOut.vscp_class, eventIn.vscp_class);
+    EXPECT_EQ(eventOut.vscp_type, eventIn.vscp_type);
+    EXPECT_EQ(eventOut.timestamp_ns, eventIn.timestamp_ns);
+    EXPECT_EQ(eventOut.sizeData, eventIn.sizeData);
+    EXPECT_EQ(0xffff, eventIn.year);
+    EXPECT_EQ(0xff, eventIn.month);
+    for (int i = 0; i < 16; i++) {
+        EXPECT_EQ(eventOut.GUID[i], eventIn.GUID[i]);
+    }
+    for (uint16_t i = 0; i < eventOut.sizeData; i++) {
+        EXPECT_EQ(eventOut.pdata[i], eventIn.pdata[i]);
+    }
+    
+    delete[] eventOut.pdata;
+    vscp_deleteEvent(&eventIn);
 }
 
 // Entry point for Google Test

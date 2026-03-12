@@ -484,7 +484,7 @@ TEST(HelperLib, vscp_makeLevel2StringMeasurementEventEx)
 }
 
 //-----------------------------------------------------------------------------
-TEST(HelperLib, vscp_convertLevel1MeasuremenToLevel2Double) 
+TEST(HelperLib, vscp_convertLevel1MeasurementToLevel2Double) 
 {
     vscpEvent e;
     e.pdata = new uint8_t[4];
@@ -499,7 +499,7 @@ TEST(HelperLib, vscp_convertLevel1MeasuremenToLevel2Double)
     e.pdata[2] = 0x1B;
     e.pdata[3] = 0x22;
 
-    bool rv = vscp_convertLevel1MeasuremenToLevel2Double( &e ); 
+    bool rv = vscp_convertLevel1MeasurementToLevel2Double( &e ); 
     ASSERT_TRUE(rv);
     ASSERT_TRUE(e.vscp_class == VSCP_CLASS2_MEASUREMENT_FLOAT);
     //printf("%d",ex.sizeData);
@@ -524,7 +524,7 @@ TEST(HelperLib, vscp_convertLevel1MeasuremenToLevel2Double)
 }
 
 //-----------------------------------------------------------------------------
-TEST(HelperLib, vscp_convertLevel1MeasuremenToLevel2DoubleEx) 
+TEST(HelperLib, vscp_convertLevel1MeasurementToLevel2DoubleEx) 
 {
     vscpEventEx ex;
     memset(&ex, 0, sizeof(vscpEventEx));
@@ -538,7 +538,7 @@ TEST(HelperLib, vscp_convertLevel1MeasuremenToLevel2DoubleEx)
     ex.data[2] = 0x1B;
     ex.data[3] = 0x22;
 
-    bool rv = vscp_convertLevel1MeasuremenToLevel2DoubleEx( &ex ); 
+    bool rv = vscp_convertLevel1MeasurementToLevel2DoubleEx( &ex ); 
     ASSERT_TRUE(rv);
     ASSERT_TRUE(ex.vscp_class == VSCP_CLASS2_MEASUREMENT_FLOAT);
     //printf("%d",ex.sizeData);
@@ -561,7 +561,7 @@ TEST(HelperLib, vscp_convertLevel1MeasuremenToLevel2DoubleEx)
 }
 
 //-----------------------------------------------------------------------------
-TEST(HelperLib, vscp_convertLevel1MeasuremenToLevel2String)
+TEST(HelperLib, vscp_convertLevel1MeasurementToLevel2String)
 {
     vscpEvent e;
     e.pdata = new uint8_t[4];
@@ -576,7 +576,7 @@ TEST(HelperLib, vscp_convertLevel1MeasuremenToLevel2String)
     e.pdata[2] = 0x1B;
     e.pdata[3] = 0x22;
 
-    bool rv = vscp_convertLevel1MeasuremenToLevel2String( &e );
+    bool rv = vscp_convertLevel1MeasurementToLevel2String( &e );
     ASSERT_TRUE(rv);
     ASSERT_TRUE(e.vscp_class == VSCP_CLASS2_MEASUREMENT_STR);
     // printf("%d\n",e.sizeData);
@@ -678,7 +678,7 @@ TEST(HelperLib, vscp_convertEventExToString)
 }
 
 //-----------------------------------------------------------------------------
-TEST(HelperLib, vscp_convertLevel1MeasuremenToLevel2StringEx) 
+TEST(HelperLib, vscp_convertLevel1MeasurementToLevel2StringEx) 
 {
     vscpEventEx ex;
     memset(&ex, 0, sizeof(vscpEventEx));
@@ -692,7 +692,7 @@ TEST(HelperLib, vscp_convertLevel1MeasuremenToLevel2StringEx)
     ex.data[2] = 0x1B;
     ex.data[3] = 0x22;
 
-    bool rv = vscp_convertLevel1MeasuremenToLevel2StringEx( &ex ); 
+    bool rv = vscp_convertLevel1MeasurementToLevel2StringEx( &ex ); 
     ASSERT_TRUE(rv);
     ASSERT_TRUE(ex.vscp_class == VSCP_CLASS2_MEASUREMENT_STR);
     // printf("%d\n",ex.sizeData);

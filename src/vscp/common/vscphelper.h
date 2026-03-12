@@ -181,6 +181,16 @@
 // Forward declaration
 class CMDF;
 
+/*!
+  @enum vscp_guid_str_format
+  @brief GUID string output format options
+*/
+enum vscp_guid_str_format {
+  VSCP_GUID_STR_FORMAT_NORMAL = 0,  //!< Standard colon-separated: FF:FF:FF:...
+  VSCP_GUID_STR_FORMAT_COMPACT,     //!< Compact with :: for leading 0xFF: ::01:02:03
+  VSCP_GUID_STR_FORMAT_UUID         //!< UUID format (8-4-4-4-12): FFFFFFFF-FFFF-FFFF-0102-030405060708
+};
+
 /*
 #ifdef __cplusplus
 extern "C"
@@ -1725,51 +1735,98 @@ vscp_setEventExGuidFromString(vscpEventEx *pEventEx, const std::string &strGUID)
 
 /*!
   @fn vscp_getGuidFromStringToArray
-  Fill event GUID from a string
+  Fill GUID array from a string. Accepts all common GUID string formats:
 
-  @param pGUID Pointer to GUID array
-  @param strGUID String with GUID (xx:yy:zz....)
-  @return True on success, false on failure.
+  - Standard colon-separated: "FF:AA:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE"
+  - UUID format: "FFAA1122-3344-5566-7788-99AABBCCDDEE"
+  - Compact format with :: for leading 0xFF bytes: "::11:22:33" results in
+    FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:11:22:33
+  - "-" alone means all zeros: 00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00
+  - "-:" prefix for leading zeros: "-:11:22:33" results in
+    00:00:00:00:00:00:00:00:00:00:00:00:00:11:22:33
+  - With braces: "{FF:AA:11:22:...}"
+  - Various separators supported: colon (:), dash (-), comma (,)
+  - Empty string results in all zeros
+
+  @param pGUID Pointer to GUID array (must be at least 16 bytes)
+  @param strGUID String with GUID in any of the supported formats
+  @return True on success, false on failure (nullptr pGUID).
 */
 bool
 vscp_getGuidFromStringToArray(unsigned char *pGUID, const std::string &strGUID);
 
 /*!
   @fn vscp_writeGuidArrayToString
-  Write out GUID to string
+  Write out GUID array to string in specified format.
+
+  Supported formats:
+  - VSCP_GUID_STR_FORMAT_NORMAL (default): Standard colon-separated
+    "FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF"
+  - VSCP_GUID_STR_FORMAT_COMPACT: Uses :: for leading 0xFF bytes
+    "::01:02:03" for a GUID starting with 0xFF bytes
+  - VSCP_GUID_STR_FORMAT_UUID: UUID format (8-4-4-4-12 hex digits)
+    "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF"
+
+  Note: bUseComma only applies to VSCP_GUID_STR_FORMAT_NORMAL format.
 
   @param strGUID Reference to string that will get GUID on string form
   @param pGUID Pointer to VSCP GUID array.
   @param bUseComma Use comma as a separator instead of colon with
-                      values in decimal.
+                      values in decimal (only for NORMAL format).
+  @param format Output format (default: VSCP_GUID_STR_FORMAT_NORMAL)
   @return True on success, false on failure.
 */
 bool
-vscp_writeGuidArrayToString(std::string &strGUID, const unsigned char *pGUID, bool bUseComma = false);
+vscp_writeGuidArrayToString(std::string &strGUID, 
+                            const unsigned char *pGUID, 
+                            bool bUseComma = false,
+                            vscp_guid_str_format format = VSCP_GUID_STR_FORMAT_NORMAL);
 
 /*!
   @fn vscp_writeGuidToString
-  Write out GUID to string
+  Write out GUID to string in specified format.
 
-  @param pEvent Pointer to VSCP event
+  Supported formats:
+  - VSCP_GUID_STR_FORMAT_NORMAL (default): Standard colon-separated
+    "FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF"
+  - VSCP_GUID_STR_FORMAT_COMPACT: Uses :: for leading 0xFF bytes
+    "::01:02:03" for a GUID starting with 0xFF bytes
+  - VSCP_GUID_STR_FORMAT_UUID: UUID format (8-4-4-4-12 hex digits)
+    "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF"
+
   @param strGUID Reference to string for written GUID
+  @param pEvent Pointer to VSCP event
+  @param format Output format (default: VSCP_GUID_STR_FORMAT_NORMAL)
   @return True on success, false on failure.
 */
 
 bool
-vscp_writeGuidToString(std::string &strGUID, const vscpEvent *pEvent);
+vscp_writeGuidToString(std::string &strGUID, 
+                       const vscpEvent *pEvent, 
+                       vscp_guid_str_format format = VSCP_GUID_STR_FORMAT_NORMAL);
 
 /*!
   @fn vscp_writeGuidToStringEx
-  Write out GUID to string
+  Write out GUID to string in specified format.
+
+  Supported formats:
+  - VSCP_GUID_STR_FORMAT_NORMAL (default): Standard colon-separated
+    "FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF"
+  - VSCP_GUID_STR_FORMAT_COMPACT: Uses :: for leading 0xFF bytes
+    "::01:02:03" for a GUID starting with 0xFF bytes
+  - VSCP_GUID_STR_FORMAT_UUID: UUID format (8-4-4-4-12 hex digits)
+    "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF"
 
   @param strGUID Reference to string for written GUID
-  @param pEvent Pointer to VSCP event
+  @param pEvent Pointer to VSCP event ex
+  @param format Output format (default: VSCP_GUID_STR_FORMAT_NORMAL)
   @return True on success, false on failure.
 */
 
 bool
-vscp_writeGuidToStringEx(std::string &strGUID, const vscpEventEx *pEvent);
+vscp_writeGuidToStringEx(std::string &strGUID, 
+                         const vscpEventEx *pEvent, 
+                         vscp_guid_str_format format = VSCP_GUID_STR_FORMAT_NORMAL);
 
 /*!
   @fn vscp_writeGuidToString4Rows
@@ -1896,8 +1953,24 @@ uint32_t
 vscp_getMsTimeStamp(void);
 
 /*!
+  @fn vscp_makeTimeStampNs
+  Make a nanosecond timestamp for UNIX_NS frame events.
+  Returns nanoseconds since Unix epoch (January 1, 1970).
+  @return Event timestamp as uint64_t nanoseconds since epoch
+*/
+uint64_t
+vscp_makeTimeStampNs(void);
+
+/*!
   @fn vscp_setEventDateTimeBlockToNow
-  Set date & time in stamp block
+  Set date & time in stamp block.
+  
+  For ORIGINAL frame version (VSCP_HEADER16_FRAME_VERSION_ORIGINAL), sets the
+  individual year/month/day/hour/minute/second fields to the current UTC time.
+  
+  For UNIX_NS frame version (VSCP_HEADER16_FRAME_VERSION_UNIX_NS), sets
+  timestamp_ns to the current time in nanoseconds since Unix epoch.
+  Also sets year=0xffff, month=0xff to indicate UNIX_NS frame.
 
   @param pEvent Event to set date/time block in.
   @return True on success.
@@ -1907,7 +1980,14 @@ vscp_setEventDateTimeBlockToNow(vscpEvent *pEvent);
 
 /*!
   @fn vscp_setEventExDateTimeBlockToNow
-  Set date & time in stamp block
+  Set date & time in stamp block.
+  
+  For ORIGINAL frame version (VSCP_HEADER16_FRAME_VERSION_ORIGINAL), sets the
+  individual year/month/day/hour/minute/second fields to the current UTC time.
+  
+  For UNIX_NS frame version (VSCP_HEADER16_FRAME_VERSION_UNIX_NS), sets
+  timestamp_ns to the current time in nanoseconds since Unix epoch.
+  Also sets year=0xffff, month=0xff to indicate UNIX_NS frame.
 
   @param pEventEx EventEx to set date/time block in.
   @return True on success.
@@ -1917,7 +1997,15 @@ vscp_setEventExDateTimeBlockToNow(vscpEventEx *pEventEx);
 
 /*!
   @fn vscp_getDateStringFromEvent
-  Get datestring from VSCP event
+  Get datestring from VSCP event.
+  
+  For ORIGINAL frame version (VSCP_HEADER16_FRAME_VERSION_ORIGINAL), uses
+  year/month/day/hour/minute/second fields and returns format "YYYY-MM-DDTHH:MM:SSZ".
+  Returns empty string if all fields are zero.
+  
+  For UNIX_NS frame version (VSCP_HEADER16_FRAME_VERSION_UNIX_NS), converts
+  timestamp_ns (nanoseconds since Unix epoch) to ISO 8601 format with nanosecond
+  precision: "YYYY-MM-DDTHH:MM:SS.nnnnnnnnnZ". Returns empty string if timestamp_ns is zero.
 
   @param dt Reference to String that will get ISO datetime string
   @param pEvent Event to get date/time info from
@@ -1928,7 +2016,15 @@ vscp_getDateStringFromEvent(std::string &dt, const vscpEvent *pEvent);
 
 /*!
   @fn vscp_getDateStringFromEventEx
-  Get datestring from VSCP EventEx
+  Get datestring from VSCP EventEx.
+  
+  For ORIGINAL frame version (VSCP_HEADER16_FRAME_VERSION_ORIGINAL), uses
+  year/month/day/hour/minute/second fields and returns format "YYYY-MM-DDTHH:MM:SSZ".
+  Returns empty string if all fields are zero.
+  
+  For UNIX_NS frame version (VSCP_HEADER16_FRAME_VERSION_UNIX_NS), converts
+  timestamp_ns (nanoseconds since Unix epoch) to ISO 8601 format with nanosecond
+  precision: "YYYY-MM-DDTHH:MM:SS.nnnnnnnnnZ". Returns empty string if timestamp_ns is zero.
 
   @param dt Reference to String that will get ISO datetime string
   @param pEventEx EventEx to get date/time info from
@@ -1939,7 +2035,14 @@ vscp_getDateStringFromEventEx(std::string &dt, const vscpEventEx *pEventEx);
 
 /*!
   @fn vscp_convertEventToJSON
-  Convert VSCP Event to JSON formatted string
+  Convert VSCP Event to JSON formatted string.
+  
+  For ORIGINAL frame version (VSCP_HEADER16_FRAME_VERSION_ORIGINAL), outputs
+  the 32-bit timestamp field in the JSON "timestamp" field.
+  
+  For UNIX_NS frame version (VSCP_HEADER16_FRAME_VERSION_UNIX_NS), outputs
+  the 64-bit timestamp_ns (nanoseconds since Unix epoch) in the JSON "timestamp" field.
+  
   @param strJSON Reference to string that will get JSON formatted event
   @param pEvent Event to convert to JSON
   @return True on success. False on failure.
@@ -1949,7 +2052,14 @@ vscp_convertEventToJSON(std::string &strJSON, const vscpEvent *pEvent);
 
 /*!
     @fn vscp_convertEventExToJSON
-    Convert VSCP EventEx to JSON formatted string
+    Convert VSCP EventEx to JSON formatted string.
+    
+    For ORIGINAL frame version (VSCP_HEADER16_FRAME_VERSION_ORIGINAL), outputs
+    the 32-bit timestamp field in the JSON "timestamp" field.
+    
+    For UNIX_NS frame version (VSCP_HEADER16_FRAME_VERSION_UNIX_NS), outputs
+    the 64-bit timestamp_ns (nanoseconds since Unix epoch) in the JSON "timestamp" field.
+    
     @param strJSON Reference to string that will get JSON formatted event
     @param pEventEx EventEx to convert to JSON
     @return True on success. False on failure.
@@ -1959,12 +2069,18 @@ vscp_convertEventExToJSON(std::string &strJSON, const vscpEventEx *pEventEx);
 
 /*!
   @fn vscp_convertJSONToEvent
-  Convert JSON string to event
+  Convert JSON string to event.
+  
+  The frame version is determined by the "head" field in the JSON:
+  - For ORIGINAL frame version (head & 0x0300 == 0x0000), the "timestamp" field
+    is parsed as a 32-bit value and stored in the timestamp field.
+  - For UNIX_NS frame version (head & 0x0300 == 0x0100), the "timestamp" field
+    is parsed as a 64-bit nanoseconds-since-epoch value and stored in timestamp_ns.
+    The year and month fields are set to 0xffff and 0xff respectively.
 
   @param pEvent Pointer to event that will be filled with data from JSON string.
   @param strJSON Reference to string with JSON formatted event data.
   @return True on success. False on failure.
-
 
   If a value is not found in the JSON string
   it will be set to zero. This means a value
@@ -1978,7 +2094,14 @@ vscp_convertJSONToEvent(vscpEvent *pEvent, std::string &strJSON);
 
 /*!
   @fn vscp_convertJSONToEventEx
-  Convert JSON string to eventex
+  Convert JSON string to eventex.
+  
+  The frame version is determined by the "head" field in the JSON:
+  - For ORIGINAL frame version (head & 0x0300 == 0x0000), the "timestamp" field
+    is parsed as a 32-bit value and stored in the timestamp field.
+  - For UNIX_NS frame version (head & 0x0300 == 0x0100), the "timestamp" field
+    is parsed as a 64-bit nanoseconds-since-epoch value and stored in timestamp_ns.
+    The year and month fields are set to 0xffff and 0xff respectively.
 
   @param pEventEx Pointer to eventex that will be filled with data from JSON string.
   @param strJSON Reference to string with JSON formatted event data.
@@ -1996,7 +2119,13 @@ vscp_convertJSONToEventEx(vscpEventEx *pEventEx, std::string &strJSONx);
 
 /*!
   @fn vscp_convertEventToXML
-  Convert VSCP Event to XML formatted string
+  Convert VSCP Event to XML formatted string.
+  
+  For ORIGINAL frame version (VSCP_HEADER16_FRAME_VERSION_ORIGINAL), outputs
+  the 32-bit timestamp field in the XML "timestamp" attribute.
+  
+  For UNIX_NS frame version (VSCP_HEADER16_FRAME_VERSION_UNIX_NS), outputs
+  the 64-bit timestamp_ns (nanoseconds since Unix epoch) in the XML "timestamp" attribute.
 
   @param strXML Reference to string that will get XML formatted event
   @param pEvent Event to convert to XML
@@ -2006,38 +2135,49 @@ bool
 vscp_convertEventToXML(std::string &strXML, vscpEvent *pEvent);
 
 /*!
-  @fn vscp_convertEventExToXML
-  Convert VSCP EventEx to XML formatted string
-
-  @param strXML Reference to string that will get XML formatted event
-  @param pEventEx EventEx to convert to XML
+  @fn vscp_convertXMLToEvent
+  Convert XML string to Event.
+  
+  For ORIGINAL frame version (head & VSCP_HEADER16_FRAME_VERSION_MASK == 0),
+  parses the timestamp as a 32-bit value.
+  
+  For UNIX_NS frame version (head & VSCP_HEADER16_FRAME_VERSION_MASK == VSCP_HEADER16_FRAME_VERSION_UNIX_NS),
+  parses the timestamp as a 64-bit nanosecond value and sets year=0xffff, month=0xff.
+  
+  @param pEvent Pointer to event that will be filled with data from XML string.
+  @param strXML Reference to string with XML formatted event data.
   @return True on success. False on failure.
  */
 bool
 vscp_convertXMLToEvent(vscpEvent *pEvent, std::string &strXML);
 
 /*!
-  @fn vscp_convertXMLToEventEx
-  Convert XML string to EventEx
+  @fn vscp_convertEventExToXML
+  Convert VSCP EventEx to XML formatted string.
+  
+  For ORIGINAL frame version (VSCP_HEADER16_FRAME_VERSION_ORIGINAL), outputs
+  the 32-bit timestamp field in the XML "timestamp" attribute.
+  
+  For UNIX_NS frame version (VSCP_HEADER16_FRAME_VERSION_UNIX_NS), outputs
+  the 64-bit timestamp_ns (nanoseconds since Unix epoch) in the XML "timestamp" attribute.
 
-  @param pEventEx Pointer to eventex that will be filled with data from XML string.
-  @param strXML Reference to string with XML formatted event data.
+  @param strXML Reference to string that will get XML formatted event
+  @param pEventEx EventEx to convert to XML
   @return True on success. False on failure.
-
-  If a value is not found in the XML string
-  it will be set to zero. This means a value
-  can be omitted in the XML string. The only
-  values that must be in the XML string is
-  class and type as long as the GUID is known
-  beforehand
  */
-
 bool
 vscp_convertEventExToXML(std::string &strXML, vscpEventEx *pEventEx);
 
 /*!
   @fn vscp_convertXMLToEventEx
-  Convert XML string to EventEx
+  Convert XML string to EventEx.
+  
+  For ORIGINAL frame version (head & VSCP_HEADER16_FRAME_VERSION_MASK == 0),
+  parses the timestamp as a 32-bit value.
+  
+  For UNIX_NS frame version (head & VSCP_HEADER16_FRAME_VERSION_MASK == VSCP_HEADER16_FRAME_VERSION_UNIX_NS),
+  parses the timestamp as a 64-bit nanosecond value and sets year=0xffff, month=0xff.
+  
   @param pEventEx Pointer to eventex that will be filled with data from XML string.
   @param strXML Reference to string with XML formatted event data.
   @return True on success. False on failure.
@@ -2047,7 +2187,14 @@ vscp_convertXMLToEventEx(vscpEventEx *pEventEx, std::string &strXML);
 
 /*!
   @fn vscp_convertEventToHTML
-  Convert VSCP Event to HTML formatted string
+  Convert VSCP Event to HTML formatted string.
+  
+  For ORIGINAL frame version (VSCP_HEADER16_FRAME_VERSION_ORIGINAL), outputs
+  the 32-bit timestamp field.
+  
+  For UNIX_NS frame version (VSCP_HEADER16_FRAME_VERSION_UNIX_NS), outputs
+  the 64-bit timestamp_ns (nanoseconds since Unix epoch).
+  
   @param strHTML Reference to string that will get HTML formatted event
   @param pEvent Event to convert to HTML
   @return True on success. False on failure.
@@ -2057,7 +2204,14 @@ vscp_convertEventToHTML(std::string &strHTML, vscpEvent *pEvent);
 
 /*!
   @fn vscp_convertEventExToHTML
-  Convert VSCP EventEx to HTML formatted string
+  Convert VSCP EventEx to HTML formatted string.
+  
+  For ORIGINAL frame version (VSCP_HEADER16_FRAME_VERSION_ORIGINAL), outputs
+  the 32-bit timestamp field.
+  
+  For UNIX_NS frame version (VSCP_HEADER16_FRAME_VERSION_UNIX_NS), outputs
+  the 64-bit timestamp_ns (nanoseconds since Unix epoch).
+  
   @param strHTML Reference to string that will get HTML formatted event
   @param pEventEx EventEx to convert to HTML
   @return True on success. False on failure.
@@ -2120,27 +2274,59 @@ vscp_set_eventex_info_from_topic(vscpEventEx *pex, const char *topic);
 
 /*!
   @fn vscp_setEventDateTime
-  Set event datetime from DateTime
+  Set event datetime from struct tm with optional subsecond precision.
+  
+  For ORIGINAL frame version (VSCP_HEADER16_FRAME_VERSION_ORIGINAL), sets the
+  individual year/month/day/hour/minute/second fields from the struct tm.
+  The ns parameter is ignored for ORIGINAL frame (no subsecond precision).
+  
+  For UNIX_NS frame version (VSCP_HEADER16_FRAME_VERSION_UNIX_NS), converts
+  the struct tm to nanoseconds since Unix epoch and adds the ns parameter
+  for subsecond precision. Also sets year=0xffff, month=0xff to indicate
+  UNIX_NS frame.
+  
   @param pEvent Pointer to event that will have date set.
   @param ptm Pointer to struct tm with date/time information to set in event.
+  @param ns Optional nanoseconds within the second (0-999999999). Default is 0.
+            Values > 999999999 are clamped. Only used for UNIX_NS frame.
   @return True on success, false on failure.
  */
 bool
-vscp_setEventDateTime(vscpEvent *pEvent, struct tm *ptm);
+vscp_setEventDateTime(vscpEvent *pEvent, struct tm *ptm, uint32_t ns = 0);
 
 /*!
   @fn vscp_setEventExDateTime
-  Set eventex datetime from DateTime
+  Set eventex datetime from struct tm with optional subsecond precision.
+  
+  For ORIGINAL frame version (VSCP_HEADER16_FRAME_VERSION_ORIGINAL), sets the
+  individual year/month/day/hour/minute/second fields from the struct tm.
+  The ns parameter is ignored for ORIGINAL frame (no subsecond precision).
+  
+  For UNIX_NS frame version (VSCP_HEADER16_FRAME_VERSION_UNIX_NS), converts
+  the struct tm to nanoseconds since Unix epoch and adds the ns parameter
+  for subsecond precision. Also sets year=0xffff, month=0xff to indicate
+  UNIX_NS frame.
+  
   @param pEventEx Pointer to eventex that will have date set.
   @param ptm Pointer to struct tm with date/time information to set in eventex.
+  @param ns Optional nanoseconds within the second (0-999999999). Default is 0.
+            Values > 999999999 are clamped. Only used for UNIX_NS frame.
   @return True on success, false on failure.
  */
 bool
-vscp_setEventExDateTime(vscpEventEx *pEventEx, struct tm *ptm);
+vscp_setEventExDateTime(vscpEventEx *pEventEx, struct tm *ptm, uint32_t ns = 0);
 
 /*!
   @fn vscp_setEventToNow
-  Set the event date to now
+  Set the event date to now.
+  
+  For ORIGINAL frame version (VSCP_HEADER16_FRAME_VERSION_ORIGINAL), sets the
+  individual year/month/day/hour/minute/second fields to the current UTC time.
+  
+  For UNIX_NS frame version (VSCP_HEADER16_FRAME_VERSION_UNIX_NS), sets
+  timestamp_ns to the current time in nanoseconds since Unix epoch (second
+  precision only). Also sets year=0xffff, month=0xff to indicate UNIX_NS frame.
+  
   @param pEvent Pointer to event that will have date set to now
   @return True on success, false on failure.
  */
@@ -2149,7 +2335,15 @@ vscp_setEventToNow(vscpEvent *pEvent);
 
 /*!
   @fn vscp_setEventExToNow
-  Set the eventex date to now
+  Set the eventex date to now.
+  
+  For ORIGINAL frame version (VSCP_HEADER16_FRAME_VERSION_ORIGINAL), sets the
+  individual year/month/day/hour/minute/second fields to the current UTC time.
+  
+  For UNIX_NS frame version (VSCP_HEADER16_FRAME_VERSION_UNIX_NS), sets
+  timestamp_ns to the current time in nanoseconds since Unix epoch (second
+  precision only). Also sets year=0xffff, month=0xff to indicate UNIX_NS frame.
+  
   @param pEventEx Pointer to eventex that will have date set to now
   @return True on success, false on failure.
  */
@@ -2522,7 +2716,14 @@ vscp_setDataArrayFromString(uint8_t *pData, uint16_t *psizeData, const std::stri
 /*!
   @fn vscp_convertEventToString
   Write event to string.
-  priority,class,type,guid,data
+  Format: head,class,type,obid,datetime,timestamp,GUID,data1,data2,data3....
+  
+  For ORIGINAL frame version (VSCP_HEADER16_FRAME_VERSION_ORIGINAL), uses
+  the 32-bit timestamp field.
+  
+  For UNIX_NS frame version (VSCP_HEADER16_FRAME_VERSION_UNIX_NS), uses
+  the 64-bit timestamp_ns field.
+  
   @param str String that receive the result
   @param pEvent Event that should be presented
   @return true on success, false on failure.
@@ -2532,7 +2733,7 @@ bool
 vscp_convertEventToString(std::string &str, const vscpEvent *pEvent);
 
 /*!
-  @fn vscp_convertEventExToString
+  @fn vscp_getEventAsString
   Get Event as string
   @param pEvent Pointer to event
   @return String representation of event.
@@ -2542,8 +2743,15 @@ vscp_getEventAsString(const vscpEvent *pEvent);
 
 /*!
   @fn vscp_convertEventExToString
-  Write event to string.
-  priority,class,type,guid,data
+  Write eventex to string.
+  Format: head,class,type,obid,datetime,timestamp,GUID,data1,data2,data3....
+  
+  For ORIGINAL frame version (VSCP_HEADER16_FRAME_VERSION_ORIGINAL), uses
+  the 32-bit timestamp field.
+  
+  For UNIX_NS frame version (VSCP_HEADER16_FRAME_VERSION_UNIX_NS), uses
+  the 64-bit timestamp_ns field.
+  
   @param str String that receive the result
   @param pEvent Event that should be presented
   @return true on success, false on failure.
@@ -2563,8 +2771,15 @@ vscp_getEventExAsString(const vscpEventEx *pEventEx);
 
 /*!
   @fn vscp_convertStringToEvent
-  Get event data from string format
-  Format: head,class,type,obid,timestamp,GUID,data1,data2,data3....
+  Get event data from string format.
+  Always converts to UNIX_NS frame format with nanosecond precision.
+  
+  Format: head,class,type,obid,datetime,timestamp,GUID,data1,data2,data3....
+  
+  If datetime is empty, the timestamp field is treated as nanoseconds since
+  Unix epoch. If datetime is present, it is parsed and converted to nanoseconds.
+  The head field will have VSCP_HEADER16_FRAME_VERSION_UNIX_NS set.
+  
   @param pEvent Event that will get data
   @param str String that contain the event on string form
   @return true on success, false on failure.
@@ -2575,8 +2790,15 @@ vscp_convertStringToEvent(vscpEvent *pEvent, const std::string &str);
 
 /*!
   @fn vscp_convertStringToEventEx
-  Get event data from string format
-  Format: head,class,type,obid,timestamp,GUID,data1,data2,data3....
+  Get event data from string format.
+  Always converts to UNIX_NS frame format with nanosecond precision.
+  
+  Format: head,class,type,obid,datetime,timestamp,GUID,data1,data2,data3....
+  
+  If datetime is empty, the timestamp field is treated as nanoseconds since
+  Unix epoch. If datetime is present, it is parsed and converted to nanoseconds.
+  The head field will have VSCP_HEADER16_FRAME_VERSION_UNIX_NS set.
+  
   @param pEventEx Pointer to VSCP event that will get the parsed data
   @param str String that contain the event on string form
   @return true on success, false on failure.
@@ -2647,12 +2869,17 @@ vscp_getFrameSizeFromEventEx(vscpEventEx *pEventEx);
 
 /*!
   @fn vscp_writeEventToFrame
-  Write event on UDP frame format
+  Write event on binary frame format.
+  
+  Uses packet format 0 (35-byte header with microsecond timestamp and datetime fields)
+  for original frame version, and packet format 1 (35-byte header with 8-byte nanosecond
+  timestamp) for UNIX_NS frame version. The frame format is determined by the event's
+  head field (VSCP_HEADER16_FRAME_VERSION_MASK).
 
   @param buf A pointer to a buffer that will receive the event.
   @param len Size of the buffer.
-  @param pkttype Is the first byte of UDP type frames that holds
-           type of packet and encryption.
+  @param pkttype Is the first byte of binary type frames that holds
+           type of packet and encryption (lower nibble for encryption).
   @param pEvent Pointer to event that should be handled.
   @return True on success, false on failure.
  */
@@ -2661,12 +2888,17 @@ vscp_writeEventToFrame(uint8_t *frame, size_t len, uint8_t pkttype, const vscpEv
 
 /*!
   @fn vscp_writeEventExToFrame
-  Write event ex on UDP frame format
+  Write event ex on binary frame format.
+  
+  Uses packet format 0 (35-byte header with microsecond timestamp and datetime fields)
+  for original frame version, and packet format 1 (35-byte header with 8-byte nanosecond
+  timestamp) for UNIX_NS frame version. The frame format is determined by the event's
+  head field (VSCP_HEADER16_FRAME_VERSION_MASK).
 
   @param buf A pointer to a buffer that will receive the event.
   @param len Size of the buffer.
-  @param pkttype Is the first byte of UDP type frames that holds
-           type of packet and encryption.
+  @param pkttype Is the first byte of binary type frames that holds
+           type of packet and encryption (lower nibble for encryption).
   @param pEventEx Pointer to event that should be handled.
   @return True on success, false on failure.
  */
@@ -2675,7 +2907,11 @@ vscp_writeEventExToFrame(uint8_t *frame, size_t len, uint8_t pkttype, const vscp
 
 /*!
   @fn vscp_getEventFromFrame
-  Get VSCP event from UDP frame
+  Get VSCP event from binary frame.
+  
+  Handles both packet format 0 (original with microsecond timestamp and datetime)
+  and packet format 1 (UNIX_NS with 8-byte nanosecond timestamp). The format is
+  determined from the packet type byte (upper nibble).
 
   @param pEvent Pointer to VSCP event that will get data from the frame,
   @param buf A pointer to a buffer that will receive the event.
@@ -2687,7 +2923,11 @@ vscp_getEventFromFrame(vscpEvent *pEvent, const uint8_t *buf, size_t len);
 
 /*!
   @fn vscp_getEventExFromFrame
-  Get VSCP event ex from UDP frame
+  Get VSCP event ex from binary frame.
+  
+  Handles both packet format 0 (original with microsecond timestamp and datetime)
+  and packet format 1 (UNIX_NS with 8-byte nanosecond timestamp). The format is
+  determined from the packet type byte (upper nibble).
 
   @param pEventEx Pointer to VSCP event ex that will get data from the
   frame,

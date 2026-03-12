@@ -40,13 +40,17 @@ CFLAGS = -std=c99  -g -O0 -DWITH_SYSTEMD -DWITH_WRAP -DOPENSSL_API_1_1 ${WARNING
 	-I../../src/common \
 	-I../../src/vscp/common \
 	-I../../src/common/third_party/nlohmann \
+	-I../../third_party/maddy/include \
+	-I../../third_party/mustache \
 	-I../../googletest/googletest/include
-CXXFLAGS = -std=c++11  -g -O0 ${WARNINGS}
+CXXFLAGS = -std=c++17  -g -O0 ${WARNINGS}
 CPPFLAGS =  -DWITH_SYSTEMD -DWITH_WRAP ${WARNINGS} -fno-var-tracking-assignments -I../.. \
 	-I. \
 	-I../../src/common \
 	-I../../src/vscp/common \
 	-I../../src/common/third_party/nlohmann \
+	-I../../third_party/maddy/include \
+	-I../../third_party/mustache \
 	-I../../googletest/googletest/include
 	
 
@@ -83,7 +87,7 @@ UNITTEST_OBJECTS =  unittest.o \
 	crc.o \
 	crc8.o \
 	randpassword.o \
-	vscp_aes.o \
+	vscp-aes.o \
 	fastpbkdf2.o \
 	vscpmd5.o \
 	vscpbase64.o \
@@ -99,7 +103,7 @@ CONNECT_TEST_OBJECTS = connect_test.o \
 	crc.o \
 	crc8.o \
 	randpassword.o \
-	vscp_aes.o \
+	vscp-aes.o \
 	fastpbkdf2.o \
 	vscpmd5.o \
 	vscpbase64.o \
@@ -137,8 +141,8 @@ register.o: ../../src/vscp/common/register.cpp ../../src/vscp/common/register.h
 vscpdatetime.o: ../../src/vscp/common/vscpdatetime.cpp ../../src/vscp/common/vscpdatetime.h
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c ../../src/vscp/common/vscpdatetime.cpp -o $@
 
-vscp_aes.o: ../../src/common/vscp_aes.c ../../src/common/vscp_aes.h
-	$(CC) $(CFLAGS) -c ../../src/common/vscp_aes.c -o $@
+vscp-aes.o: ../../src/common/vscp-aes.c ../../src/common/vscp-aes.h
+	$(CC) $(CFLAGS) -c ../../src/common/vscp-aes.c -o $@
 
 crc.o: ../../src/common/crc.c ../../src/common/crc.h
 	$(CC) $(CFLAGS) -c ../../src/common/crc.c -o $@
