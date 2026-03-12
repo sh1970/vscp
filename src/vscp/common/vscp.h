@@ -58,15 +58,27 @@ extern "C" {
 
 /*          * * * General structure for VSCP * * *   */
 
-/* This structure is for VSCP Level II   */
+/*
+  This structure is for VSCP Level II
+*/
 
 typedef struct _vscpEvent {
 
   /*
       Bit 15 - This is a dumb node. No MDF, register, nothing.
+
+      -------------------------------------------
+      GUID types:
+      0 - Is standard GUID's
+      1 - GUID is IP v.6 address
+      2 - GUID is RFC 4122 Version 1
+      3 - GUID is RFC 4122 Version 4
+      4 - GUID is random number (not recommended)
+      -------------------------------------------
       Bit 14 - GUID type
       Bit 13 - GUID type
-      Bit 12 - GUID type (GUID is IP v.6 address if set and 13/14 is zero.)
+      Bit 12 - GUID type
+
       Bit 8-9 - Frame version. (0 = original, 1 = frame with Unix ns timestamp, 2 = reserved, 3 = reserved)
       Bit 10-11 = Reserved
       Bit 765 =  priority, Priority 0-7 where 0 is highest priority.
@@ -129,9 +141,19 @@ typedef struct _vscpEventEx {
 
   /*
       Bit 15 - This is a dumb node. No MDF, register, nothing.
+
+      -------------------------------------------
+      GUID types:
+      0 - Is standard GUID's
+      1 - GUID is IP v.6 address
+      2 - GUID is RFC 4122 Version 1
+      3 - GUID is RFC 4122 Version 4
+      4 - GUID is random number (not recommended)
+      -------------------------------------------
       Bit 14 - GUID type
       Bit 13 - GUID type
-      Bit 12 - GUID type (GUID is IP v.6 address if set and 13/14 is zero.)
+      Bit 12 - GUID type
+
       Bit 8-9 - Frame version. (0 = original, 1 = frame with Unix ns timestamp, 2 = reserved, 3 = reserved)
       Bit 765 =  priority, Priority 0-7 where 0 is highest priority.
       Bit 4 = hard coded, true for a hard coded device.
@@ -216,6 +238,7 @@ typedef vscpEventEx *PVSCPEVENTEX;
 /* https://www.sohamkamani.com/blog/2016/10/05/uuid1-vs-uuid4/ */
 #define VSCP_HEADER16_GUID_TYPE_RFC4122V1 0x2000 /* GUID is RFC 4122 Version 1 */
 #define VSCP_HEADER16_GUID_TYPE_RFC4122V4 0x3000 /* GUID is RFC 4122 Version 4 */
+#define VSCP_HEADER16_GUID_TYPE_RANDOM    0x4000 /* GUID is random number (not recommended) */
 
 #define VSCP_MASK_PRIORITY  0xE0
 #define VSCP_MASK_GUID_TYPE 0x8000
