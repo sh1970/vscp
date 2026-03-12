@@ -68,12 +68,7 @@ typedef struct _vscpEvent {
       Bit 15 - This is a dumb node. No MDF, register, nothing.
 
       -------------------------------------------
-      GUID types:
-      0 - Is standard GUID's
-      1 - GUID is IP v.6 address
-      2 - GUID is RFC 4122 Version 1
-      3 - GUID is RFC 4122 Version 4
-      4 - GUID is random number (not recommended)
+      GUID types: 0-7 (see defined below)
       -------------------------------------------
       Bit 14 - GUID type
       Bit 13 - GUID type
@@ -143,12 +138,7 @@ typedef struct _vscpEventEx {
       Bit 15 - This is a dumb node. No MDF, register, nothing.
 
       -------------------------------------------
-      GUID types:
-      0 - Is standard GUID's
-      1 - GUID is IP v.6 address
-      2 - GUID is RFC 4122 Version 1
-      3 - GUID is RFC 4122 Version 4
-      4 - GUID is random number (not recommended)
+      GUID types: 0-7 (see defined below)
       -------------------------------------------
       Bit 14 - GUID type
       Bit 13 - GUID type
@@ -705,6 +695,14 @@ struct vscpMyNode {
 #define VSCP_ERROR_INTERFACE          68 /* Interface error (not defined etc) */
 #define VSCP_ERROR_INVALID_FORMAT     69 /* Format is wrong. Error in conversion */
 #define VSCP_ERROR_INVALID_CONTEXT    70 /* Context is invalid or missing */
+
+
+/*!
+  A timestamp that is less than this value is considered to be an event that should
+  have date and time set by the receiving end. This is the same as was true before
+  when all parts of datetime were set to zero. 
+*/
+#define VSCP_TIMESTAMP_ONE_SECOND 1000000000  /* One second in nanoseconds */
 
 /*!
     HLO (High Level Object) type (bits 7,6,5,4)

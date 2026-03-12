@@ -32,6 +32,7 @@
 #endif
 
 #include <string>
+#include <chrono>
 
 #include <stdio.h>
 #include <time.h>
@@ -41,31 +42,69 @@
 #include <vscphelper.h>
 
 ///////////////////////////////////////////////////////////////////////////////
+// Helper: getTimeStruct
+//
+
+struct tm 
+vscpdatetime::getTimeStruct(void) const
+{
+    struct tm result;
+    time_t secs = static_cast<time_t>(m_timestamp / NS_PER_SECOND);
+    
+#ifdef WIN32
+    gmtime_s(&result, &secs);
+#else
+    gmtime_r(&secs, &result);
+#endif
+    
+    return result;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Helper: setFromTimeStruct
+//
+
+void 
+vscpdatetime::setFromTimeStruct(const struct tm& tm, uint32_t nanoseconds)
+{
+    struct tm temp = tm;
+    temp.tm_isdst = 0;
+    
+    // Use timegm (or _mkgmtime on Windows) to convert UTC tm to time_t
+#ifdef WIN32
+    time_t secs = _mkgmtime(&temp);
+#else
+    time_t secs = timegm(&temp);
+#endif
+    
+    m_timestamp = static_cast<int64_t>(secs) * NS_PER_SECOND + nanoseconds;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // ctor
 //
 
 vscpdatetime::vscpdatetime(void)
 {
-    setNow();
-    m_millisecond = 0;
+    setUTCNow();
 }
 
 vscpdatetime::vscpdatetime(const std::string &dt)
 {
+    m_timestamp = 0;
     set(dt);
-    m_millisecond = 0;
 }
 
 vscpdatetime::vscpdatetime(vscpEvent &ev)
 {
+    m_timestamp = 0;
     set(ev);
-    m_millisecond = 0;
 }
 
 vscpdatetime::vscpdatetime(vscpEventEx &ex)
 {
+    m_timestamp = 0;
     set(ex);
-    m_millisecond = 0;
 }
 
 vscpdatetime::vscpdatetime(uint16_t year,
@@ -76,22 +115,81 @@ vscpdatetime::vscpdatetime(uint16_t year,
                            uint8_t second,
                            uint32_t millisecond)
 {
-    setYear(year);
-    setMonth(month);
-    setDay(day);
-    setHour(hour);
-    setMinute(minute);
-    setSecond(second);
-    setMilliSecond(millisecond);
+    m_timestamp = 0;
+    set(year, month, day, hour, minute, second, millisecond);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// dstor
+// dtor
 //
 
 vscpdatetime::~vscpdatetime(void)
 {
     ;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Getters
+//
+
+uint16_t
+vscpdatetime::getYear(void) const
+{
+    struct tm tm = getTimeStruct();
+    return tm.tm_year + 1900;
+}
+
+vscpdatetime::month
+vscpdatetime::getMonth(void) const
+{
+    struct tm tm = getTimeStruct();
+    return static_cast<month>(tm.tm_mon);
+}
+
+uint8_t
+vscpdatetime::getDay(void) const
+{
+    struct tm tm = getTimeStruct();
+    return tm.tm_mday;
+}
+
+uint8_t
+vscpdatetime::getHour(void) const
+{
+    struct tm tm = getTimeStruct();
+    return tm.tm_hour;
+}
+
+uint8_t
+vscpdatetime::getMinute(void) const
+{
+    struct tm tm = getTimeStruct();
+    return tm.tm_min;
+}
+
+uint8_t
+vscpdatetime::getSecond(void) const
+{
+    struct tm tm = getTimeStruct();
+    return tm.tm_sec;
+}
+
+uint32_t
+vscpdatetime::getMilliSeconds(void) const
+{
+    return static_cast<uint32_t>((m_timestamp % NS_PER_SECOND) / NS_PER_MILLISECOND);
+}
+
+uint32_t
+vscpdatetime::getMicroSeconds(void) const
+{
+    return static_cast<uint32_t>((m_timestamp % NS_PER_SECOND) / NS_PER_MICROSECOND);
+}
+
+uint32_t
+vscpdatetime::getNanoSeconds(void) const
+{
+    return static_cast<uint32_t>(m_timestamp % NS_PER_SECOND);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -101,9 +199,16 @@ vscpdatetime::~vscpdatetime(void)
 bool
 vscpdatetime::setDate(uint16_t year, uint8_t month, uint8_t day)
 {
-    if (!setYear(year)) return false;
-    if (!setMonth(month)) return false;
-    if (!setDay(day)) return false;
+    if (!month || (month > 12)) return false;
+    if (!day || (day > 31)) return false;
+    
+    struct tm tm = getTimeStruct();
+    tm.tm_year = year - 1900;
+    tm.tm_mon = month - 1;  // Convert 1-12 to 0-11
+    tm.tm_mday = day;
+    
+    uint32_t nanos = getNanoSeconds();
+    setFromTimeStruct(tm, nanos);
     return true;
 }
 
@@ -115,29 +220,23 @@ bool
 vscpdatetime::setISODate(const std::string &strDate)
 {
     size_t pos;
-    std::string isodt = strDate.c_str();
+    std::string isodt = strDate;
 
     try {
-        // year
-        m_year = std::stoi(isodt.c_str(), &pos);
+        uint16_t year = std::stoi(isodt, &pos);
         pos++; // Move past '-'
         isodt = isodt.substr(pos);
 
-        // month
-        m_month = std::stoi(isodt.c_str(), &pos);
+        uint8_t month = std::stoi(isodt, &pos);
         pos++; // Move past '-'
         isodt = isodt.substr(pos);
 
-        // day
-        m_day = std::stoi(isodt.c_str(), &pos);
-        pos++; // Move past 'T' or ' '
-        isodt = isodt.substr(pos);
+        uint8_t day = std::stoi(isodt, &pos);
 
+        return setDate(year, month, day);
     } catch (...) {
         return false;
     }
-
-    return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -150,10 +249,16 @@ vscpdatetime::setTime(uint8_t hour,
                       uint8_t second,
                       uint32_t millisecond)
 {
-    if (!setHour(hour)) return false;
-    if (!setMinute(minute)) return false;
-    if (!setSecond(second)) return false;
-    setMilliSecond(millisecond);
+    if (hour > 23) return false;
+    if (minute > 59) return false;
+    if (second > 59) return false;
+    
+    struct tm tm = getTimeStruct();
+    tm.tm_hour = hour;
+    tm.tm_min = minute;
+    tm.tm_sec = second;
+    
+    setFromTimeStruct(tm, millisecond * NS_PER_MILLISECOND);
     return true;
 }
 
@@ -165,26 +270,23 @@ bool
 vscpdatetime::setISOTime(const std::string &strTime)
 {
     size_t pos;
-    std::string isodt = strTime.c_str();
+    std::string isodt = strTime;
 
     try {
-        // hour
-        m_hour = std::stoi(isodt.c_str(), &pos);
+        uint8_t hour = std::stoi(isodt, &pos);
         pos++; // Move past ':'
         isodt = isodt.substr(pos);
 
-        // minute
-        m_minute = std::stoi(isodt.c_str(), &pos);
+        uint8_t minute = std::stoi(isodt, &pos);
         pos++; // Move past ':'
         isodt = isodt.substr(pos);
 
-        // second
-        m_second = std::stoi(isodt.c_str(), &pos);
+        uint8_t second = std::stoi(isodt, &pos);
+
+        return setTime(hour, minute, second, 0);
     } catch (...) {
         return false;
     }
-
-    return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -194,7 +296,10 @@ vscpdatetime::setISOTime(const std::string &strTime)
 bool
 vscpdatetime::setYear(uint16_t year)
 {
-    m_year = year;
+    struct tm tm = getTimeStruct();
+    tm.tm_year = year - 1900;
+    uint32_t nanos = getNanoSeconds();
+    setFromTimeStruct(tm, nanos);
     return true;
 }
 
@@ -206,7 +311,11 @@ bool
 vscpdatetime::setMonth(uint8_t month)
 {
     if (!month || (month > 12)) return false;
-    m_month = month-1;
+    
+    struct tm tm = getTimeStruct();
+    tm.tm_mon = month - 1;  // Convert 1-12 to 0-11
+    uint32_t nanos = getNanoSeconds();
+    setFromTimeStruct(tm, nanos);
     return true;
 }
 
@@ -218,7 +327,11 @@ bool
 vscpdatetime::setDay(uint8_t day)
 {
     if (!day || (day > 31)) return false;
-    m_day = day;
+    
+    struct tm tm = getTimeStruct();
+    tm.tm_mday = day;
+    uint32_t nanos = getNanoSeconds();
+    setFromTimeStruct(tm, nanos);
     return true;
 }
 
@@ -230,7 +343,11 @@ bool
 vscpdatetime::setHour(uint8_t hour)
 {
     if (hour > 23) return false;
-    m_hour = hour;
+    
+    struct tm tm = getTimeStruct();
+    tm.tm_hour = hour;
+    uint32_t nanos = getNanoSeconds();
+    setFromTimeStruct(tm, nanos);
     return true;
 }
 
@@ -242,7 +359,11 @@ bool
 vscpdatetime::setMinute(uint8_t minute)
 {
     if (minute > 59) return false;
-    m_minute = minute;
+    
+    struct tm tm = getTimeStruct();
+    tm.tm_min = minute;
+    uint32_t nanos = getNanoSeconds();
+    setFromTimeStruct(tm, nanos);
     return true;
 }
 
@@ -254,7 +375,11 @@ bool
 vscpdatetime::setSecond(uint8_t second)
 {
     if (second > 59) return false;
-    m_second = second;
+    
+    struct tm tm = getTimeStruct();
+    tm.tm_sec = second;
+    uint32_t nanos = getNanoSeconds();
+    setFromTimeStruct(tm, nanos);
     return true;
 }
 
@@ -265,8 +390,20 @@ vscpdatetime::setSecond(uint8_t second)
 bool
 vscpdatetime::setMilliSecond(uint32_t millisecond)
 {
-    m_millisecond = millisecond;
+    // Clear sub-second portion and add new milliseconds
+    uint64_t secs = m_timestamp / NS_PER_SECOND;
+    m_timestamp = secs * NS_PER_SECOND + millisecond * NS_PER_MILLISECOND;
     return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// SetMillisecond (alternate spelling)
+//
+
+bool
+vscpdatetime::SetMillisecond(uint32_t ms)
+{
+    return setMilliSecond(ms);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -282,64 +419,67 @@ vscpdatetime::set(uint16_t year,
                   uint8_t second,
                   uint32_t millisecond)
 {
-    if (!setYear(year)) return false;
-    if (!setMonth(month)) return false;
-    if (!setDay(day)) return false;
-    if (!setHour(hour)) return false;
-    if (!setMinute(minute)) return false;
-    if (!setSecond(second)) return false;
-    setMilliSecond(millisecond);
+    if (!month || (month > 12)) return false;
+    if (!day || (day > 31)) return false;
+    if (hour > 23) return false;
+    if (minute > 59) return false;
+    if (second > 59) return false;
 
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+    tm.tm_year = year - 1900;
+    tm.tm_mon = month - 1;  // Convert 1-12 to 0-11
+    tm.tm_mday = day;
+    tm.tm_hour = hour;
+    tm.tm_min = minute;
+    tm.tm_sec = second;
+    tm.tm_isdst = 0;
+
+    setFromTimeStruct(tm, millisecond * NS_PER_MILLISECOND);
     return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// set
+// set (from string)
 //
 
 bool
 vscpdatetime::set(std::string dt)
 {
     size_t pos;
-    std::string isodt = dt.c_str();
+    std::string isodt = dt;
 
     try {
-        // year
-        m_year = std::stoi(isodt.c_str(), &pos);
+        uint16_t year = std::stoi(isodt, &pos);
         pos++; // Move past '-'
         isodt = isodt.substr(pos);
 
-        // month
-        m_month = std::stoi(isodt.c_str(), &pos);
+        uint8_t month = std::stoi(isodt, &pos);
         pos++; // Move past '-'
         isodt = isodt.substr(pos);
 
-        // day
-        m_day = std::stoi(isodt.c_str(), &pos);
+        uint8_t day = std::stoi(isodt, &pos);
         pos++; // Move past 'T' or ' '
         isodt = isodt.substr(pos);
 
-        // hour
-        m_hour = std::stoi(isodt.c_str(), &pos);
+        uint8_t hour = std::stoi(isodt, &pos);
         pos++; // Move past ':'
         isodt = isodt.substr(pos);
 
-        // minute
-        m_minute = std::stoi(isodt.c_str(), &pos);
+        uint8_t minute = std::stoi(isodt, &pos);
         pos++; // Move past ':'
         isodt = isodt.substr(pos);
 
-        // second
-        m_second = std::stoi(isodt.c_str(), &pos);
+        uint8_t second = std::stoi(isodt, &pos);
+
+        return set(year, month, day, hour, minute, second, 0);
     } catch (...) {
         return false;
     }
-
-    return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// set
+// set (from const char*)
 //
 
 bool
@@ -351,44 +491,33 @@ vscpdatetime::set(const char *pdt)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// set
+// set (from vscpEvent)
 //
 
 bool
 vscpdatetime::set(vscpEvent &ev)
 {
-    if (!set(ev.year, ev.month, ev.day, ev.hour, ev.minute, ev.second))
-        return false;
-
-    return true;
+    return set(ev.year, ev.month, ev.day, ev.hour, ev.minute, ev.second, 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// set
+// set (from vscpEventEx)
 //
 
 bool
 vscpdatetime::set(vscpEventEx &ex)
 {
-    if (!set(ex.year, ex.month, ex.day, ex.hour, ex.minute, ex.second))
-        return false;
-
-    return true;
+    return set(ex.year, ex.month, ex.day, ex.hour, ex.minute, ex.second, 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// set
+// set (from struct tm)
 //
 
 bool
 vscpdatetime::set(const struct tm &tm)
 {
-    m_year   = tm.tm_year + 1900;
-    m_month  = tm.tm_mon;
-    m_day    = tm.tm_mday;
-    m_hour   = tm.tm_hour;
-    m_minute = tm.tm_min;
-    m_second = tm.tm_sec;
+    setFromTimeStruct(tm, 0);
     return true;
 }
 
@@ -399,25 +528,10 @@ vscpdatetime::set(const struct tm &tm)
 void
 vscpdatetime::setNow(void)
 {
-    time_t rawtime;    
-    struct tm *ptm;
-
-    time(&rawtime);
-#ifdef WIN32
-    struct tm tbuf;
-    ptm = &tbuf;
-    localtime_s(ptm, &rawtime);
-#else   
-    struct tm buf;
-    ptm = localtime_r(&rawtime, &buf);
-#endif    
-
-    m_year = ptm->tm_year + 1900;
-    m_month = ptm->tm_mon;
-    m_day = ptm->tm_mday;
-    m_hour = ptm->tm_hour;
-    m_minute = ptm->tm_min;
-    m_second = ptm->tm_sec;
+    auto now = std::chrono::system_clock::now();
+    auto duration = now.time_since_epoch();
+    auto nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(duration);
+    m_timestamp = static_cast<int64_t>(nanos.count());
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -427,26 +541,8 @@ vscpdatetime::setNow(void)
 void
 vscpdatetime::setUTCNow(void)
 {
-    time_t rawtime;    
-    struct tm *ptm;
-
-    time(&rawtime);
-#ifdef WIN32
-    struct tm tbuf;
-    ptm = &tbuf;
-    gmtime_s(ptm, &rawtime);
-#else    
-    struct tm buf;
-    ptm = gmtime_r(&rawtime, &buf);
-#endif
-
-    m_year = ptm->tm_year + 1900;
-    m_month = ptm->tm_mon;
-    m_day = ptm->tm_mday;
-    m_hour = ptm->tm_hour;
-    m_minute = ptm->tm_min;
-    m_second = ptm->tm_sec;
-
+    // std::chrono::system_clock is always UTC
+    setNow();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -456,22 +552,9 @@ vscpdatetime::setUTCNow(void)
 vscpdatetime
 vscpdatetime::Now(void)
 {
-  time_t rawtime;    
-
-  time(&rawtime);
-
-#ifdef WIN32
-  struct tm tm;
-  localtime_s(&tm, &rawtime);
-  return vscpdatetime(tm);
-#else   
-  struct tm *ptm;
-  struct tm buf;
-  ptm = localtime_r(&rawtime, &buf);
-  return vscpdatetime(*ptm);
-#endif
-
-    
+    vscpdatetime dt;
+    dt.setNow();
+    return dt;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -481,27 +564,9 @@ vscpdatetime::Now(void)
 vscpdatetime
 vscpdatetime::UTCNow(void)
 {
-    time_t rawtime;    
-    struct tm *ptm;
-
-    time(&rawtime);
-#ifdef WIN32
-    struct tm tbuf;
-    ptm = &tbuf;
-    gmtime_s(ptm, &rawtime);
-#else
-    struct tm buf;
-    ptm = gmtime_r(&rawtime, &buf);
-#endif
-
-    /*m_year = ptm->tm_year + 1900;
-    m_month = ptm->tm_mon;
-    m_day = ptm->tm_mday;
-    m_hour = ptm->tm_hour;
-    m_minute = ptm->tm_min;
-    m_second = ptm->tm_sec;*/
-
-    return vscpdatetime(*ptm);
+    vscpdatetime dt;
+    dt.setUTCNow();
+    return dt;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -511,8 +576,9 @@ vscpdatetime::UTCNow(void)
 vscpdatetime
 vscpdatetime::zeroTime(void)
 {
-    // m_hour = m_minute = m_second = m_millisecond = 0;
-    return vscpdatetime(0, 0, 0, 0, 0, 0, 0);
+    vscpdatetime dt;
+    dt.m_timestamp = 0;
+    return dt;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -522,10 +588,10 @@ vscpdatetime::zeroTime(void)
 vscpdatetime
 vscpdatetime::zeroDate(void)
 {
-    // m_year = m_month = m_day = 0;
-    return vscpdatetime(0, 0, 0, 0, 0, 0, 0);
-    ;
-};
+    vscpdatetime dt;
+    dt.m_timestamp = 0;
+    return dt;
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 // dateTimeZero
@@ -534,8 +600,9 @@ vscpdatetime::zeroDate(void)
 vscpdatetime
 vscpdatetime::dateTimeZero(void)
 {
-    // set(0, 0, 0, 0, 0, 0, 0);
-    return vscpdatetime(0, 0, 0, 0, 0, 0, 0);
+    vscpdatetime dt;
+    dt.m_timestamp = 0;
+    return dt;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -546,28 +613,15 @@ std::string
 vscpdatetime::getISODateTime(bool bSeparator) const
 {
     char buf[32];
-    std::string isodt;
-    struct tm tbuf;
-
-    const time_t t = vscpdatetime::toSysTime();
+    struct tm tm = getTimeStruct();
+    
     if (bSeparator) {
-#ifdef WIN32
-        gmtime_s(&tbuf, &t);
-        strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &tbuf); 
-#else      
-        strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", gmtime_r(&t, &tbuf));
-#endif
+        strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &tm);
     } else {
-#ifdef WIN32
-        gmtime_s(&tbuf, &t);
-        strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%SZ", &tbuf);
-#else
-        strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%SZ", gmtime_r(&t, &tbuf));
-#endif        
+        strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%SZ", &tm);
     }
-    isodt = buf;
-
-    return isodt;
+    
+    return std::string(buf);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -578,19 +632,9 @@ std::string
 vscpdatetime::getISODate(void)
 {
     char buf[32];
-    std::string isodt;
-    struct tm tbuf;
-
-    const time_t t = toSysTime();
-#ifdef WIN32
-    gmtime_s(&tbuf, &t);
-    strftime(buf, sizeof(buf), "%Y-%m-%d", &tbuf);
-#else
-    strftime(buf, sizeof(buf), "%Y-%m-%d", gmtime_r(&t, &tbuf));
-#endif
-    isodt = buf;
-
-    return isodt;
+    struct tm tm = getTimeStruct();
+    strftime(buf, sizeof(buf), "%Y-%m-%d", &tm);
+    return std::string(buf);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -601,19 +645,9 @@ std::string
 vscpdatetime::getISOTime(void)
 {
     char buf[32];
-    std::string isodt;
-    struct tm tbuf;
-
-    const time_t t = toSysTime();
-#ifdef WIN32
-    gmtime_s(&tbuf, &t);
-    strftime(buf, sizeof(buf), "%H:%M:%SZ", &tbuf);
-#else
-    strftime(buf, sizeof(buf), "%H:%M:%SZ", gmtime_r(&t, &tbuf));
-#endif
-    isodt = buf;
-
-    return isodt;
+    struct tm tm = getTimeStruct();
+    strftime(buf, sizeof(buf), "%H:%M:%SZ", &tm);
+    return std::string(buf);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -636,14 +670,22 @@ vscpdatetime::setFromJulian(const long ljd)
     c       = (long)((b - 122.1) / 365.25);
     d       = (long)(365.25 * c);
     e       = (long)((b - d) / 30.6001);
-    m_day   = (uint8_t)((int)b - d - (long)(30.6001 * e));
-    m_month = (uint8_t)((int)(e < 13.5) ? e - 1 : e - 13);
-    m_year  = (uint16_t)((int)(m_month > 2.5) ? (c - 4716) : c - 4715);
-    if (m_year <= 0) {
-        m_year -= 1;
+    
+    uint8_t day   = (uint8_t)((int)b - d - (long)(30.6001 * e));
+    uint8_t month = (uint8_t)((int)(e < 13.5) ? e - 1 : e - 13);
+    uint16_t year  = (uint16_t)((int)(month > 2) ? (c - 4716) : c - 4715);
+    if (year <= 0) {
+        year -= 1;
     }
 
-    return;
+    // Preserve time portion
+    struct tm tm = getTimeStruct();
+    tm.tm_year = year - 1900;
+    tm.tm_mon = month - 1;
+    tm.tm_mday = day;
+    
+    uint32_t nanos = getNanoSeconds();
+    setFromTimeStruct(tm, nanos);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -653,12 +695,10 @@ vscpdatetime::setFromJulian(const long ljd)
 // Todd T. Knarr <tknarr@silverglass.org>
 //
 
-long
+static long
 ymdToJd(const int iYear, const int iMonth, const int iDay)
 {
     long jul_day;
-
-#ifndef JULDATE_USE_ALTERNATE_METHOD
 
     int a, b;
     int year = iYear, month = iMonth, day = iDay;
@@ -678,75 +718,7 @@ ymdToJd(const int iYear, const int iMonth, const int iDay)
     jul_day = (long)(365.25 * year - year_corr) +
               (long)(30.6001 * (month + 1)) + day + 1720995L + b;
 
-#else
-
-    long lmonth = (long)iMonth, lday = (long)iDay, lyear = (long)iYear;
-
-    // Adjust BC years
-    if (lyear < 0) lyear++;
-
-    jul_day = lday - 32075L +
-              1461L * (lyear + 4800L + (lmonth - 14L) / 12L) / 4L +
-              367L * (lmonth - 2L - (lmonth - 14L) / 12L * 12L) / 12L -
-              3L * ((lyear + 4900L + (lmonth - 14L) / 12L) / 100L) / 4L;
-
-#endif
-
     return jul_day;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// JdToYmd
-//
-// Copyright (C) 2000, 2002
-// Todd T. Knarr <tknarr@silverglass.org>
-//
-
-void
-JdToYmd(const long lJD, int *piYear, int *piMonth, int *piDay)
-{
-
-#ifndef JULDATE_USE_ALTERNATE_METHOD
-
-    long a, b, c, d, e, z, alpha;
-
-    z = lJD;
-    if (z < 2299161L)
-        a = z;
-    else {
-        alpha = (long)((z - 1867216.25) / 36524.25);
-        a     = z + 1 + alpha - alpha / 4;
-    }
-    b        = a + 1524;
-    c        = (long)((b - 122.1) / 365.25);
-    d        = (long)(365.25 * c);
-    e        = (long)((b - d) / 30.6001);
-    *piDay   = (int)b - d - (long)(30.6001 * e);
-    *piMonth = (int)(e < 13.5) ? e - 1 : e - 13;
-    *piYear  = (int)(*piMonth > 2.5) ? (c - 4716) : c - 4715;
-    if (*piYear <= 0) *piYear -= 1;
-
-#else
-
-    long t1, t2, yr, mo;
-
-    t1       = lJD + 68569L;
-    t2       = 4L * t1 / 146097L;
-    t1       = t1 - (146097L * t2 + 3L) / 4L;
-    yr       = 4000L * (t1 + 1L) / 1461001L;
-    t1       = t1 - 1461L * yr / 4L + 31L;
-    mo       = 80L * t1 / 2447L;
-    *piDay   = (int)(t1 - 2447L * mo / 80L);
-    t1       = mo / 11L;
-    *piMonth = (int)(mo + 2L - 12L * t1);
-    *piYear  = (int)(100L * (t2 - 49L) + yr + t1);
-
-    // Correct for BC years
-    if (*piYear <= 0) *piYear -= 1;
-
-#endif
-
-    return;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -756,20 +728,20 @@ JdToYmd(const long lJD, int *piYear, int *piMonth, int *piDay)
 long
 vscpdatetime::getJulian(void)
 {
-    return ymdToJd(m_year, m_month, m_day);
+    struct tm tm = getTimeStruct();
+    // ymdToJd expects 1-based month (1-12)
+    return ymdToJd(tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// DayOfYear
+// getDayOfYear
 //
 
 int
 vscpdatetime::getDayOfYear(void) const
 {
-    long soy;
-    long lJulianDay = ymdToJd(m_year, m_month, m_day);
-    soy             = ymdToJd(m_year, 1, 1);
-    return (int)(lJulianDay - soy + 1);
+    struct tm tm = getTimeStruct();
+    return tm.tm_yday + 1;  // tm_yday is 0-based, we want 1-based
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -779,46 +751,35 @@ vscpdatetime::getDayOfYear(void) const
 time_t
 vscpdatetime::toSysTime(void) const
 {
-    struct tm tmRep;
-    time_t t;
-
-    tmRep.tm_year  = m_year - 1900;
-    tmRep.tm_mon   = m_month;
-    tmRep.tm_mday  = m_day;
-    tmRep.tm_hour  = m_hour;
-    tmRep.tm_min   = m_minute;
-    tmRep.tm_sec   = m_second;
-    tmRep.tm_isdst = 0;
-
-    t = mktime(&tmRep);
-    return t;
+    return static_cast<time_t>(m_timestamp / NS_PER_SECOND);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// valid
+// isValid
 //
 
 bool
 vscpdatetime::isValid(void)
 {
+    struct tm tm = getTimeStruct();
+    
     int days_in_month_normal[]   = { 31, 28, 31, 30, 31, 30,
                                    31, 31, 30, 31, 30, 31 };
     int days_in_month_leapyear[] = { 31, 29, 31, 30, 31, 30,
                                      31, 31, 30, 31, 30, 31 };
 
-    if (m_month > 12) return false;
-    if (0 == m_month) return false;
-    if (0 == m_day) return false;
+    if (tm.tm_mon > 11) return false;
+    if (tm.tm_mday == 0) return false;
 
     if (isLeapYear()) {
-        if (m_day > days_in_month_leapyear[m_month]) return false;
+        if (tm.tm_mday > days_in_month_leapyear[tm.tm_mon]) return false;
     } else {
-        if (m_day > days_in_month_normal[m_month]) return false;
+        if (tm.tm_mday > days_in_month_normal[tm.tm_mon]) return false;
     }
 
-    if (m_hour > 23) return false;
-    if (m_minute > 59) return false;
-    if (m_second > 59) return false;
+    if (tm.tm_hour > 23) return false;
+    if (tm.tm_min > 59) return false;
+    if (tm.tm_sec > 59) return false;
 
     return true;
 }
@@ -830,10 +791,10 @@ vscpdatetime::isValid(void)
 bool
 vscpdatetime::isLeapYear(void)
 {
-    long jd1, jd2;
-    jd1 = ymdToJd(m_year, 2, 28);
-    jd2 = ymdToJd(m_year, 3, 1);
-    return ((jd2 - jd1) > 1);
+    struct tm tm = getTimeStruct();
+    int year = tm.tm_year + 1900;
+    
+    return ((year % 4 == 0) && (year % 100 != 0)) || (year % 400 == 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -843,22 +804,12 @@ vscpdatetime::isLeapYear(void)
 int
 vscpdatetime::getWeekNumber(void) const
 {
+    struct tm tm = getTimeStruct();
     constexpr int DAYS_PER_WEEK = 7;
-    time_t t       = toSysTime();
-    struct tm *ptm;
-
-#ifdef _WIN32
-    struct tm tbuf;
-    ptm = &tbuf;
-    localtime_s(ptm, &t);
-#else    
-    struct tm tbuf;
-    ptm = localtime_r(&t, &tbuf);
-#endif    
-
-    const int wday  = ptm->tm_wday;
+    
+    const int wday  = tm.tm_wday;
     const int delta = wday ? wday - 1 : DAYS_PER_WEEK - 1;
-    return (ptm->tm_yday + DAYS_PER_WEEK - delta) / DAYS_PER_WEEK;
+    return (tm.tm_yday + DAYS_PER_WEEK - delta) / DAYS_PER_WEEK;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -868,21 +819,12 @@ vscpdatetime::getWeekNumber(void) const
 vscpdatetime::weekDay
 vscpdatetime::getWeekDay(void) const
 {
-  time_t t       = toSysTime();
-  struct tm *ptm;
-#ifdef WIN32
-    struct tm tbuf;
-    ptm = &tbuf;
-    localtime_s(ptm, &t);
-#else    
-    struct tm tbuf;
-    ptm = localtime_r(&t, &tbuf);
-#endif
-    return static_cast<weekDay>(ptm->tm_wday);
+    struct tm tm = getTimeStruct();
+    return static_cast<weekDay>(tm.tm_wday);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// GetWeekDayName
+// getWeekDayName
 //
 
 std::string
@@ -892,73 +834,25 @@ vscpdatetime::getWeekDayName(weekDay weekday, nameFlags flags)
 
     if (name_Full == flags) {
         switch (weekday) {
-
-            case Sun:
-                strday = "Sunday";
-                break;
-
-            case Mon:
-                strday = "Monday";
-                break;
-
-            case Tue:
-                strday = "Thursday";
-                break;
-
-            case Wed:
-                strday = "Wednesday";
-                break;
-
-            case Thu:
-                strday = "Thursday";
-                break;
-
-            case Fri:
-                strday = "Friday";
-                break;
-
-            case Sat:
-                strday = "Saturday";
-                break;
-
-            default:
-                strday = "---";
-                break;
+            case Sun: strday = "Sunday"; break;
+            case Mon: strday = "Monday"; break;
+            case Tue: strday = "Tuesday"; break;
+            case Wed: strday = "Wednesday"; break;
+            case Thu: strday = "Thursday"; break;
+            case Fri: strday = "Friday"; break;
+            case Sat: strday = "Saturday"; break;
+            default: strday = "---"; break;
         }
     } else {
         switch (weekday) {
-
-            case Sun:
-                strday = "Sun";
-                break;
-
-            case Mon:
-                strday = "Mon";
-                break;
-
-            case Tue:
-                strday = "Thu";
-                break;
-
-            case Wed:
-                strday = "Wed";
-                break;
-
-            case Thu:
-                strday = "Thu";
-                break;
-
-            case Fri:
-                strday = "Fri";
-                break;
-
-            case Sat:
-                strday = "Sat";
-                break;
-
-            default:
-                strday = "---";
-                break;
+            case Sun: strday = "Sun"; break;
+            case Mon: strday = "Mon"; break;
+            case Tue: strday = "Tue"; break;
+            case Wed: strday = "Wed"; break;
+            case Thu: strday = "Thu"; break;
+            case Fri: strday = "Fri"; break;
+            case Sat: strday = "Sat"; break;
+            default: strday = "---"; break;
         }
     }
 
@@ -976,113 +870,35 @@ vscpdatetime::getMonthName(month month, nameFlags flags)
 
     if (name_Full == flags) {
         switch (month) {
-
-            case Jan:
-                strmonth = "January";
-                break;
-
-            case Feb:
-                strmonth = "February";
-                break;
-
-            case Mar:
-                strmonth = "Mars";
-                break;
-
-            case Apr:
-                strmonth = "April";
-                break;
-
-            case May:
-                strmonth = "May";
-                break;
-
-            case Jun:
-                strmonth = "June";
-                break;
-
-            case Jul:
-                strmonth = "July";
-                break;
-
-            case Aug:
-                strmonth = "August";
-                break;
-
-            case Sep:
-                strmonth = "September";
-                break;
-
-            case Oct:
-                strmonth = "October";
-                break;
-
-            case Nov:
-                strmonth = "November";
-                break;
-
-            case Dec:
-                strmonth = "December";
-                break;
-
-            default:
-                strmonth = "---";
-                break;
+            case Jan: strmonth = "January"; break;
+            case Feb: strmonth = "February"; break;
+            case Mar: strmonth = "March"; break;
+            case Apr: strmonth = "April"; break;
+            case May: strmonth = "May"; break;
+            case Jun: strmonth = "June"; break;
+            case Jul: strmonth = "July"; break;
+            case Aug: strmonth = "August"; break;
+            case Sep: strmonth = "September"; break;
+            case Oct: strmonth = "October"; break;
+            case Nov: strmonth = "November"; break;
+            case Dec: strmonth = "December"; break;
+            default: strmonth = "---"; break;
         }
     } else {
         switch (month) {
-
-            case Jan:
-                strmonth = "Jan";
-                break;
-
-            case Feb:
-                strmonth = "Feb";
-                break;
-
-            case Mar:
-                strmonth = "Mar";
-                break;
-
-            case Apr:
-                strmonth = "Apr";
-                break;
-
-            case May:
-                strmonth = "May";
-                break;
-
-            case Jun:
-                strmonth = "Jun";
-                break;
-
-            case Jul:
-                strmonth = "Jul";
-                break;
-
-            case Aug:
-                strmonth = "Aug";
-                break;
-
-            case Sep:
-                strmonth = "Sep";
-                break;
-
-            case Oct:
-                strmonth = "Oct";
-                break;
-
-            case Nov:
-                strmonth = "Nov";
-                break;
-
-            case Dec:
-                strmonth = "Dec";
-                break;
-
-            default:
-                strmonth = "---";
-                break;
+            case Jan: strmonth = "Jan"; break;
+            case Feb: strmonth = "Feb"; break;
+            case Mar: strmonth = "Mar"; break;
+            case Apr: strmonth = "Apr"; break;
+            case May: strmonth = "May"; break;
+            case Jun: strmonth = "Jun"; break;
+            case Jul: strmonth = "Jul"; break;
+            case Aug: strmonth = "Aug"; break;
+            case Sep: strmonth = "Sep"; break;
+            case Oct: strmonth = "Oct"; break;
+            case Nov: strmonth = "Nov"; break;
+            case Dec: strmonth = "Dec"; break;
+            default: strmonth = "---"; break;
         }
     }
 
@@ -1090,10 +906,7 @@ vscpdatetime::getMonthName(month month, nameFlags flags)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// getMonthName
-//
-// https://stackoverflow.com/questions/13804095/get-the-time-zone-gmt-offset-in-c
-//
+// tzOffset2LocalTime
 //
 
 int
@@ -1108,20 +921,14 @@ vscpdatetime::tzOffset2LocalTime(void)
 #else
     ptm = gmtime(&rawtime);
 #endif
-    // Request that mktime() looksup dst in timezone database
     ptm->tm_isdst = -1;
-    gmt           = mktime(ptm);
+    gmt = mktime(ptm);
 
     return (int)difftime(rawtime, gmt);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // tz_offset_second
-//
-// return difference in **seconds** of the tm_mday, tm_hour, tm_min, tm_sec
-// members.
-//
-// https://stackoverflow.com/questions/32424125/c-code-to-get-local-time-offset-in-minutes-relative-to-utc
 //
 
 long
@@ -1134,16 +941,16 @@ vscpdatetime::tz_offset_second(time_t t)
     localtime_s(&local, &t);
     gmtime_s(&utc, &t);
 #else    
-    struct tm tbuf2;
-    local = *localtime_r(&t, &tbuf2);
-    utc   = *gmtime_r(&t, &tbuf2);
+    struct tm tbuf;
+    local = *localtime_r(&t, &tbuf);
+    utc   = *gmtime_r(&t, &tbuf);
 #endif    
     
     long diff =
       ((local.tm_hour - utc.tm_hour) * 60 + (local.tm_min - utc.tm_min)) * 60L +
       (local.tm_sec - utc.tm_sec);
     int delta_day = local.tm_mday - utc.tm_mday;
-    // If |delta_day| > 1, then end-of-month wrap
+    
     if ((delta_day == 1) || (delta_day < -1)) {
         diff += 24L * 60 * 60;
     } else if ((delta_day == -1) || (delta_day > 1)) {

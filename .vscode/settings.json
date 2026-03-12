@@ -145,5 +145,14 @@
         "**/node_modules/*/**": true
     },
     "editor.tabSize": 2,
-    "markdown-table-formatter.globalColumnSizes": "Same Table Size"
+    "markdown-table-formatter.globalColumnSizes": "Same Table Size",
+    "chat.tools.terminal.autoApprove": {
+      "/^cd /home/akhe/development/VSCP/vscp/tests/mdfparser && \\./build/test --gtest_filter=-parseMDF\\.JSON_SIMPLE_Registers 2>&1 \\| tail -20$/": {
+        "approve": true,
+        "matchCommandLine": true
+      },
+      "make": true,
+      "./build/test": true,
+      "timeout": true
+    }
 }

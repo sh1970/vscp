@@ -93,7 +93,7 @@ class cguid
     /*!
         Nill the GUID
     */
-    void clear(void) { memset(&m_id, 0, 16); };
+    void clear(void) { memset(&m_guid, 0, 16); };
 
     /*!
         Get GUID from string
@@ -128,6 +128,30 @@ class cguid
     std::string toString(void);
 
     /*!
+        GUID to string in compact form using :: for leading 0xFF bytes
+        @param strGUID String that will receive GUID
+    */
+    void toStringCompact(std::string &strGUID);
+
+    /*!
+        GUID to string in compact form using :: for leading 0xFF bytes
+        @return guid on compact string form
+    */
+    std::string toStringCompact(void);
+
+    /*!
+        GUID to string in UUID format (8-4-4-4-12)
+        @param strGUID String that will receive GUID
+    */
+    void toStringUUID(std::string &strGUID);
+
+    /*!
+        GUID to string in UUID format (8-4-4-4-12)
+        @return guid in UUID string form
+    */
+    std::string toStringUUID(void);
+
+    /*!
         GUID to string
         @return GUID as string
     */
@@ -142,7 +166,7 @@ class cguid
         Return pointer to GUID
         \return pointer to GUID.
     */
-    const uint8_t *getGUID(void) { return m_id; };
+    const uint8_t *getGUID(void) { return m_guid; };
 
     /*!
         Get GUID for specific position
@@ -153,7 +177,7 @@ class cguid
     {
         int pos;
         pos = n & 0xf;
-        return m_id[pos];
+        return m_guid[pos];
     };
 
     /*!
@@ -163,7 +187,7 @@ class cguid
     {
         int pos;
         pos = (n & 0x0f);
-        return m_id[pos];
+        return m_guid[pos];
     };
 
     /*!
@@ -173,38 +197,38 @@ class cguid
     {
         int pos;
         pos       = (n & 0x0f);
-        m_id[pos] = value;
+        m_guid[pos] = value;
     };
 
     /*!
         Set LSB GUID position
     */
-    void setLSB(const unsigned char value) { m_id[15] = value; };
+    void setLSB(const unsigned char value) { m_guid[15] = value; };
 
     /*!
         Get LSB GUID position
     */
-    uint8_t getLSB(void) { return m_id[15]; };
+    uint8_t getLSB(void) { return m_guid[15]; };
 
     /*!
         Set MSB GUID position
     */
-    void setMSB(const unsigned char value) { m_id[0] = value; };
+    void setMSB(const unsigned char value) { m_guid[0] = value; };
 
     /*!
         Get MSB GUID position
     */
-    uint8_t getMSB(void) { return m_id[0]; };
+    uint8_t getMSB(void) { return m_guid[0]; };
 
     /*!
         Get Nickname GUID position
     */
-    uint16_t getNicknameID(void) { return (m_id[14] << 8) + m_id[15]; };
+    uint16_t getNicknameID(void) { return (m_guid[14] << 8) + m_guid[15]; };
 
     /*!
         Get Byte Nickname GUID position
     */
-    uint8_t getNickname(void) { return m_id[15]; };
+    uint8_t getNickname(void) { return m_guid[15]; };
 
     /*!
         Fill array with GUID MSB first (STANDARD way)
@@ -249,7 +273,7 @@ class cguid
     void setNicknameID(uint16_t nicknameid);
 
     // GUID id  MSB (index=0) -> LSB (index=15)
-    uint8_t m_id[16];
+    uint8_t m_guid[16];
 };
 
 #endif

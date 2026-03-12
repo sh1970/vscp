@@ -114,14 +114,14 @@ class vscpdatetime
     vscpdatetime(const std::string& dt);
 
     /*!
-        Constructor to set dattime object from VSCP event.
+        Constructor to set datetime object from VSCP event.
 
         @param ev VSCP event to set datetime from.
     */
     vscpdatetime(vscpEvent& ev);
 
     /*!
-        Constructor to set dattime object from VSCP eventex.
+        Constructor to set datetime object from VSCP eventex.
 
         @param ex VSCP eventex to set datetime from.
     */
@@ -185,7 +185,7 @@ class vscpdatetime
     bool setISODate(const char* pDate)
     {
         std::string str(pDate);
-        return setISOTime(str);
+        return setISODate(str);
     };
 
     /*!
@@ -233,12 +233,12 @@ class vscpdatetime
              uint8_t second,
              uint32_t millisecond = 0);
     /*!
-        Set dattime from string on format YYYY:MM:DDTHH:MM:SS
+        Set datetime from string on format YYYY:MM:DDTHH:MM:SS
     */
     bool set(std::string dt);
 
     /*!
-        Set dattime from const char pointer to format YYYY:MM:DDTHH:MM:SS
+        Set datetime from const char pointer to format YYYY:MM:DDTHH:MM:SS
     */
     bool set(const char* pdt);
 
@@ -262,7 +262,7 @@ class vscpdatetime
     void setFromJulian(const long ljd);
 
     /*!
-        Set dattime object from VSCP eventex.
+        Set datetime object from VSCP eventex.
 
         @param ex VSCP eventex to set datetime from.
     */
@@ -279,6 +279,24 @@ class vscpdatetime
     void setUTCNow(void);
 
     /*!
+        Set date/time to UTC now if timestamp is less than one second.
+        Useful for initializing unset/zero timestamps.
+        Preserves the sub-second nanosecond portion.
+
+        @return True if timestamp was updated, false if already valid
+    */
+    bool setNowIfTimeStampRelative(void)
+    {
+        if (m_timestamp < NS_PER_SECOND) {
+            int64_t nanos = m_timestamp;  // Preserve sub-second portion
+            setUTCNow();
+            m_timestamp = (m_timestamp / NS_PER_SECOND) * NS_PER_SECOND + nanos;
+            return true;
+        }
+        return false;
+    }
+
+    /*!
         Return current local time.
     */
     static vscpdatetime Now(void);
@@ -289,46 +307,59 @@ class vscpdatetime
     static vscpdatetime UTCNow(void);
 
     /*!
+        Create from 64-bit nanosecond Unix timestamp
+
+        @param timestamp Nanoseconds since Unix epoch (Jan 1, 1970 00:00:00 UTC)
+        @return vscpdatetime object initialized with the timestamp
+    */
+    static vscpdatetime fromTimestamp(int64_t timestamp)
+    {
+        vscpdatetime dt;
+        dt.m_timestamp = timestamp;
+        return dt;
+    }
+
+    /*!
         Get current set year
 
         @return Year is returned.
     */
-    uint16_t getYear(void) const { return m_year; };
+    uint16_t getYear(void) const;
 
     /*!
         Get current set month
 
         @return Month is returned.
     */
-    month getMonth(void) const { return static_cast<month>(m_month); };
+    month getMonth(void) const;
 
     /*!
         Get current set day
 
         @return Day is returned.
     */
-    uint8_t getDay(void) const { return m_day; };
+    uint8_t getDay(void) const;
 
     /*!
         Get current set hours
 
         @return Hours is returned.
     */
-    uint8_t getHour(void) const { return m_hour; };
+    uint8_t getHour(void) const;
 
     /*!
         Get current set minutes
 
         @return Minutes is returned.
     */
-    uint8_t getMinute(void) const { return m_minute; };
+    uint8_t getMinute(void) const;
 
     /*!
         Get current set seconds
 
         @return Seconds is returned.
     */
-    uint8_t getSecond(void) const { return m_second; };
+    uint8_t getSecond(void) const;
 
     /*!
         Set year
@@ -392,11 +423,7 @@ class vscpdatetime
         @param millisecond Milliseconds to set.
         @return True on success.
     */
-    bool SetMillisecond(uint32_t ms)
-    {
-        m_millisecond = ms;
-        return true;
-    };
+    bool SetMillisecond(uint32_t ms);
 
     /*!
         Reset time to midnight
@@ -416,9 +443,37 @@ class vscpdatetime
     /*!
         Get milliseconds
 
-        @return Milliseconds as uin32_t
+        @return Milliseconds as uint32_t
     */
-    uint32_t getMilliSeconds(void) const { return m_millisecond; };
+    uint32_t getMilliSeconds(void) const;
+    
+    /*!
+        Get microseconds
+
+        @return Microseconds as uint32_t
+    */
+    uint32_t getMicroSeconds(void) const;
+    
+    /*!
+        Get nanoseconds
+
+        @return Nanoseconds as uint32_t (sub-second portion only)
+    */
+    uint32_t getNanoSeconds(void) const;
+    
+    /*!
+        Get raw timestamp
+
+        @return Nanoseconds since epoch as int64_t (can be negative for pre-1970 dates)
+    */
+    int64_t getTimestamp(void) const { return m_timestamp; };
+    
+    /*!
+        Set raw timestamp
+
+        @param timestamp Nanoseconds since epoch
+    */
+    void setTimestamp(int64_t timestamp) { m_timestamp = timestamp; };
 
     /*!
         Get ISO datetime as standard string on format YYYY-MM-DDTHH:MM:SS
@@ -545,8 +600,8 @@ class vscpdatetime
     */
     inline bool isSameDate(vscpdatetime& dt) const
     {
-        return ((dt.getYear() == m_year) && (dt.getMonth() == m_month) &&
-                (dt.getDay() == m_day));
+        return ((dt.getYear() == getYear()) && (dt.getMonth() == getMonth()) &&
+                (dt.getDay() == getDay()));
     }
 
     /*!
@@ -554,8 +609,8 @@ class vscpdatetime
     */
     inline bool isSameTime(vscpdatetime& dt) const
     {
-        return ((dt.getHour() == m_hour) && (dt.getMinute() == m_minute) &&
-                (dt.getSecond() == m_second));
+        return ((dt.getHour() == getHour()) && (dt.getMinute() == getMinute()) &&
+                (dt.getSecond() == getSecond()));
     }
 
     static double diffSeconds(vscpdatetime& t1, vscpdatetime& t2)
@@ -641,13 +696,9 @@ class vscpdatetime
 
     //
     // Function      : ++ and -- operators, prefix and postfix forms
-    //
     // Author        : Todd Knarr
-    //
     // Creation date : 1 Dec 1995
-    //
     // Parameters    : none
-    //
     // Return values : New Date
     //
     vscpdatetime& operator++()
@@ -685,14 +736,24 @@ class vscpdatetime
     }
 
   private:
-    uint16_t m_year;  // year
-    uint8_t m_month;  // month 1-12
-    uint8_t m_day;    // day 1-31
-    uint8_t m_hour;   // hour 0-23
-    uint8_t m_minute; // minute 0-59
-    uint8_t m_second; // second 0-59
 
-    uint32_t m_millisecond;
+    /// Timestamp in nanoseconds since Unix epoch (Jan 1, 1970 00:00:00 UTC)
+    /// Signed to support dates before 1970
+    int64_t m_timestamp;  
+    
+    /// Constants for time conversion
+    static const int64_t NS_PER_MICROSECOND = 1000LL;
+    static const int64_t NS_PER_MILLISECOND = 1000000LL;
+    static const int64_t NS_PER_SECOND = 1000000000LL;
+    static const int64_t NS_PER_MINUTE = 60LL * NS_PER_SECOND;
+    static const int64_t NS_PER_HOUR = 60LL * NS_PER_MINUTE;
+    static const int64_t NS_PER_DAY = 24LL * NS_PER_HOUR;
+
+    /// Helper to get tm struct from timestamp
+    struct tm getTimeStruct(void) const;
+    
+    /// Helper to set timestamp from tm struct
+    void setFromTimeStruct(const struct tm& tm, uint32_t nanoseconds = 0);
 };
 
 #endif

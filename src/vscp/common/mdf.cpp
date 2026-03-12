@@ -615,8 +615,10 @@ CMDF_Register::operator=(const CMDF_Register &other)
   }
   m_list_bit.clear();
 
-  // Assign
-  m_list_bit = other.m_list_bit;
+  // Note: We don't deep copy bit/value lists for block register copies.
+  // Block register copies are created for different offsets and don't 
+  // need the bit/value definitions (they inherit from the base register).
+  // This avoids complex deep copy logic and double-free issues.
 
   // Clear up value list
   std::deque<CMDF_Value *>::iterator iterValue;
@@ -628,9 +630,6 @@ CMDF_Register::operator=(const CMDF_Register &other)
     }
   }
   m_list_value.clear();
-
-  // Assign
-  m_list_value = other.m_list_value;
 
   return *this;
 }
@@ -8092,7 +8091,7 @@ CMDF::parseMDF_JSON(const std::string &path)
       if (j["module"].contains("remotevar") && j["module"]["remotevar"].is_array()) {
         for (auto &rvar : j["module"]["remotevar"].items()) {
           // std::cout << "key: " << rvar.key() << ", value:" << rvar.value() << '\n';
-          spdlog::trace("Parse-JSON: Remote variable key = {0} type = {1}.", (std::string)rvar.key(), (std::string)rvar.value());
+          spdlog::trace("Parse-JSON: Remote variable key = {0} type = {1}.", (std::string)rvar.key(), rvar.value().dump());
           if (rvar.value().is_object()) {
 
             CMDF_RemoteVariable *prvar = new CMDF_RemoteVariable();
@@ -9607,7 +9606,7 @@ CMDF::getRemoteVariable(const std::string &name)
     std::string rname          = prvar->m_name;
     vscp_trim(rname);
     vscp_makeLower(rname);
-    if (rname == name) {
+    if (rname == remotevar) {
       return prvar;
     }
   }
