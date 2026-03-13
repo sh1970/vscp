@@ -22,8 +22,14 @@ jobs:
       with:
         vcpkgGitCommitId: '01f602195983451bc83e72f4214af2cbc495aa94'
         vcpkgDirectory: '${{ github.workspace }}/vcpkg'
-        vcpkgJsonGlob: '**/vcpkg.json'
-        runVcpkgInstall: true
+
+    - name: Install dependencies via vcpkg
+      run: |
+        vcpkg install openssl:x64-windows
+        vcpkg install pthreads:x64-windows
+        vcpkg install mosquitto:x64-windows
+        vcpkg install expat:x64-windows
+        vcpkg install dlfcn-win32:x64-windows
 
     - name: Configure CMake
       run: |
