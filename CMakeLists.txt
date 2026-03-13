@@ -226,7 +226,7 @@ else()
     include_directories(${EXPAT_INCLUDE_DIRS})
 
     # Mosquitto lib
-    find_package(MOSQUITTO REQUIRED)
+    find_package(Mosquitto REQUIRED)
 
     # On macOS, mosquitto depends on cJSON - find and include it
     if(APPLE)
