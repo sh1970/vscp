@@ -22,7 +22,12 @@ jobs:
       run: sudo apt-get update
 
     - name: Install Google Test
-      run: sudo apt-get install -y libgtest-dev && cd /usr/src/gtest && sudo mkdir -p build && cd build && sudo cmake .. && sudo make && sudo make install
+      run: |
+        sudo apt-get install -y libgtest-dev
+        cd /usr/src/googletest
+        sudo cmake -S . -B build -DBUILD_GMOCK=OFF
+        sudo cmake --build build
+        sudo cmake --install build
 
     - name: Install dependencies
       run: |
