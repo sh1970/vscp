@@ -208,7 +208,9 @@ if (WIN32)
     include(FindMosquitto)
 
     # Expat C library
-    find_package(expat CONFIG REQUIRED)
+    include(FindEXPAT)
+    find_package(EXPAT REQUIRED)
+    include_directories(${EXPAT_INCLUDE_DIRS})
 
     # dlfcn
     find_package(dlfcn-win32 CONFIG REQUIRED)
@@ -417,7 +419,7 @@ if(MSVC)
         OpenSSL::Crypto
         OpenSSL::SSL OpenSSL::Crypto
         ${MOSQUITTO_LIBRARIES}
-        expat::expat
+        ${EXPAT_LIBRARIES}
         dlfcn-win32::dl
 #        spdlog::spdlog spdlog::spdlog_header_only
     )
