@@ -422,17 +422,31 @@ if(MSVC)
 #        spdlog::spdlog spdlog::spdlog_header_only
     )
 else()
-    target_link_libraries(vscpd PRIVATE     
-        m
-        dl
-        systemd
-        Threads::Threads
-        OpenSSL::SSL 
-        OpenSSL::Crypto
-        ${OPENSSL_LIBRARIES}
-        ${MOSQUITTO_LIBRARIES}
-        ${EXPAT_LIBRARIES}
-    )
+    if(APPLE)
+        target_link_libraries(vscpd PRIVATE     
+            m
+            dl
+            Threads::Threads
+            OpenSSL::SSL 
+            OpenSSL::Crypto
+            ${OPENSSL_LIBRARIES}
+            ${MOSQUITTO_LIBRARIES}
+            ${EXPAT_LIBRARIES}
+        )
+    else()
+        # Linux
+        target_link_libraries(vscpd PRIVATE     
+            m
+            dl
+            systemd
+            Threads::Threads
+            OpenSSL::SSL 
+            OpenSSL::Crypto
+            ${OPENSSL_LIBRARIES}
+            ${MOSQUITTO_LIBRARIES}
+            ${EXPAT_LIBRARIES}
+        )
+    endif()
 endif()
 
 if(WIN32)
