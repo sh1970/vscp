@@ -24,12 +24,7 @@ jobs:
         vcpkgDirectory: '${{ github.workspace }}/vcpkg'
 
     - name: Install dependencies via vcpkg
-      run: |
-        vcpkg install openssl:x64-windows
-        vcpkg install pthreads:x64-windows
-        vcpkg install mosquitto:x64-windows
-        vcpkg install expat:x64-windows
-        vcpkg install dlfcn-win32:x64-windows
+      run: vcpkg install --triplet x64-windows
 
     - name: Configure CMake
       run: |
