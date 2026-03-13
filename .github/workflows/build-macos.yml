@@ -28,13 +28,17 @@ jobs:
         MOSQUITTO_PREFIX=$(brew --prefix mosquitto)
         OPENSSL_PREFIX=$(brew --prefix openssl@3)
         EXPAT_PREFIX=$(brew --prefix expat)
+        echo "Mosquitto prefix: ${MOSQUITTO_PREFIX}"
+        echo "OpenSSL prefix: ${OPENSSL_PREFIX}"
+        echo "Expat prefix: ${EXPAT_PREFIX}"
+        echo "--- Mosquitto include contents ---"
+        ls -la ${MOSQUITTO_PREFIX}/include/ || true
+        echo "--- Expat include contents ---"
+        ls -la ${EXPAT_PREFIX}/include/ || true
         cmake -B ${{github.workspace}}/build \
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
           -DOPENSSL_ROOT_DIR=${OPENSSL_PREFIX} \
-          -DMOSQUITTO_INCLUDE_DIR=${MOSQUITTO_PREFIX}/include \
-          -DMOSQUITTO_LIBRARY=${MOSQUITTO_PREFIX}/lib/libmosquitto.dylib \
-          -DEXPAT_INCLUDE_DIR=${EXPAT_PREFIX}/include \
-          -DEXPAT_LIBRARY=${EXPAT_PREFIX}/lib/libexpat.dylib
+          -DCMAKE_PREFIX_PATH="${MOSQUITTO_PREFIX};${EXPAT_PREFIX};${OPENSSL_PREFIX}"
 
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} -j$(sysctl -n hw.ncpu)
