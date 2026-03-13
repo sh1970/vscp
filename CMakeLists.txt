@@ -47,7 +47,10 @@ endif()
 if(WIN32)
 add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
 add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+elseif(APPLE)
+SET(GCC_VSCP_COMPILE_FLAGS "-Wno-psabi")
 else()
+# Linux - enable systemd support
 SET(GCC_VSCP_COMPILE_FLAGS "-Wno-psabi -D WITH_SYSTEMD")
 endif()
 
