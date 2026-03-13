@@ -318,9 +318,9 @@ if (WIN32)
     src/vscp/common/vscp-client-base.cpp
     src/vscp/common/vscp-client-mqtt.h
     src/vscp/common/vscp-client-mqtt.cpp
-    ./third_party/mustache/mustache.hpp
-    ./third_party/sqlite3/sqlite3.h
-    ./third_party/sqlite3/sqlite3.c
+    ${CMAKE_SOURCE_DIR}/third_party/mustache/mustache.hpp
+    ${CMAKE_SOURCE_DIR}/third_party/sqlite3/sqlite3.h
+    ${CMAKE_SOURCE_DIR}/third_party/sqlite3/sqlite3.c
     src/common/windows/getopt.c
     src/common/configfile.h
     src/common/configfile.cpp
@@ -368,9 +368,9 @@ else()
     src/vscp/common/vscp-client-base.cpp
     src/vscp/common/vscp-client-mqtt.h
     src/vscp/common/vscp-client-mqtt.cpp
-    ./third_party/mustache/mustache.hpp
-    ./third_party/sqlite3/sqlite3.h
-    ./third_party/sqlite3/sqlite3.c
+    ${CMAKE_SOURCE_DIR}/third_party/mustache/mustache.hpp
+    ${CMAKE_SOURCE_DIR}/third_party/sqlite3/sqlite3.h
+    ${CMAKE_SOURCE_DIR}/third_party/sqlite3/sqlite3.c
     src/common/configfile.h
     src/common/configfile.cpp
     src/common/sockettcp.h
@@ -395,15 +395,15 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 if (WIN32)
     #find_path(PTHREAD_INCLUDE_DIR pthread.h)
-    include_directories( PUBLIC ./src/vscp/daemon
-                            ./src/common 
-                            ./src/vscp/common/  
-                            ./src/common/third_party
-                            ./third_party/nlohmann/include
-                            ./third_party/sqlite3/
-                            ./third_party/spdlog/include/
-                            ./third_party/mustache/
-                            ./src/common/windows
+    include_directories( PUBLIC ${CMAKE_SOURCE_DIR}/src/vscp/daemon
+                            ${CMAKE_SOURCE_DIR}/src/common 
+                            ${CMAKE_SOURCE_DIR}/src/vscp/common/  
+                            ${CMAKE_SOURCE_DIR}/src/common/third_party
+                            ${CMAKE_SOURCE_DIR}/third_party/nlohmann/include
+                            ${CMAKE_SOURCE_DIR}/third_party/sqlite3/
+                            ${CMAKE_SOURCE_DIR}/third_party/spdlog/include/
+                            ${CMAKE_SOURCE_DIR}/third_party/mustache/
+                            ${CMAKE_SOURCE_DIR}/src/common/windows
                             ${PThreads4W_INCLUDE_DIR}
                             ${CMAKE_BINARY_DIR}
                             ${OPENSSL_INCLUDE_DIR}
@@ -412,14 +412,14 @@ if (WIN32)
                             ${DLFCN_INCLUDES}
                             ${LOCAL_WIN_INCLUDE} )
 else()
-    include_directories( PUBLIC ./src/vscp/daemon
-                            ./src/common 
-                            ./src/vscp/common/  
-                            ./src/common/third_party
-                            ./third_party/nlohmann/include
-                            ./third_party/sqlite3/
-                            ./third_party/mustache/
-                            ./third_party/spdlog/include/
+    include_directories( PUBLIC ${CMAKE_SOURCE_DIR}/src/vscp/daemon
+                            ${CMAKE_SOURCE_DIR}/src/common 
+                            ${CMAKE_SOURCE_DIR}/src/vscp/common/  
+                            ${CMAKE_SOURCE_DIR}/src/common/third_party
+                            ${CMAKE_SOURCE_DIR}/third_party/nlohmann/include
+                            ${CMAKE_SOURCE_DIR}/third_party/sqlite3/
+                            ${CMAKE_SOURCE_DIR}/third_party/mustache/
+                            ${CMAKE_SOURCE_DIR}/third_party/spdlog/include/
                             ${PThreads4W_INCLUDE_DIR}
                             ${CMAKE_BINARY_DIR}
                             ${OPENSSL_INCLUDE_DIR}
