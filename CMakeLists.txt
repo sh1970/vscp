@@ -198,6 +198,12 @@ find_package(OpenSSL REQUIRED)
 
 # Windows Libs
 if (WIN32)
+    # Ensure vcpkg installed directory is in CMAKE_PREFIX_PATH for Find modules
+    if(DEFINED ENV{VCPKG_ROOT} AND DEFINED VCPKG_TARGET_TRIPLET)
+        list(PREPEND CMAKE_PREFIX_PATH "$ENV{VCPKG_ROOT}/installed/${VCPKG_TARGET_TRIPLET}")
+        message(STATUS "Added vcpkg to CMAKE_PREFIX_PATH: $ENV{VCPKG_ROOT}/installed/${VCPKG_TARGET_TRIPLET}")
+    endif()
+
     # pthread
     find_package(pthread REQUIRED)
 
@@ -205,10 +211,9 @@ if (WIN32)
     #find_package(unofficial-sqlite3 CONFIG REQUIRED)
 
     # Mosquitto lib
-    include(FindMosquitto)
+    find_package(MOSQUITTO REQUIRED)
 
     # Expat C library
-    include(FindEXPAT)
     find_package(EXPAT REQUIRED)
     include_directories(${EXPAT_INCLUDE_DIRS})
 
@@ -217,12 +222,11 @@ if (WIN32)
 
 else()
     # expat
-    include(FindEXPAT)
     find_package(EXPAT REQUIRED)
     include_directories(${EXPAT_INCLUDE_DIRS})
 
     # Mosquitto lib
-    include(FindMosquitto)
+    find_package(MOSQUITTO REQUIRED)
 
     # On macOS, mosquitto depends on cJSON - find and include it
     if(APPLE)
