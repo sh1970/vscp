@@ -83,7 +83,7 @@ jobs:
           -DOPENSSL_ROOT_DIR=${OPENSSL_PREFIX} \
           -DCMAKE_PREFIX_PATH="${OPENSSL_PREFIX};${EXPAT_PREFIX};${GTEST_PREFIX}" \
           -DCMAKE_CXX_FLAGS="-I${GTEST_PREFIX}/include" \
-          -DCMAKE_LIBRARY_PATH="${GTEST_PREFIX}/lib"
+          -DCMAKE_EXE_LINKER_FLAGS="-L${GTEST_PREFIX}/lib"
 
     - name: Build unit tests
       working-directory: ${{github.workspace}}/tests/build
