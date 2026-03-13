@@ -28,7 +28,7 @@
 # cmake --build . --config Release
 #
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.16...3.31)
 project(vscpd LANGUAGES CXX C)
 set(PACKAGE_AUTHOR "Ake Hedman, the VSCP Project")
 
@@ -199,9 +199,23 @@ find_package(OpenSSL REQUIRED)
 # Windows Libs
 if (WIN32)
     # Ensure vcpkg installed directory is in CMAKE_PREFIX_PATH for Find modules
-    if(DEFINED ENV{VCPKG_ROOT} AND DEFINED VCPKG_TARGET_TRIPLET)
-        list(PREPEND CMAKE_PREFIX_PATH "$ENV{VCPKG_ROOT}/installed/${VCPKG_TARGET_TRIPLET}")
-        message(STATUS "Added vcpkg to CMAKE_PREFIX_PATH: $ENV{VCPKG_ROOT}/installed/${VCPKG_TARGET_TRIPLET}")
+    # Handle both classic mode and manifest mode installations
+    if(DEFINED VCPKG_TARGET_TRIPLET)
+        # Manifest mode: vcpkg installs to build directory
+        if(EXISTS "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}")
+            list(PREPEND CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}")
+            message(STATUS "Added vcpkg manifest to CMAKE_PREFIX_PATH: ${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}")
+        endif()
+        # Classic mode: vcpkg installs to VCPKG_ROOT
+        if(DEFINED ENV{VCPKG_ROOT})
+            list(PREPEND CMAKE_PREFIX_PATH "$ENV{VCPKG_ROOT}/installed/${VCPKG_TARGET_TRIPLET}")
+            message(STATUS "Added vcpkg classic to CMAKE_PREFIX_PATH: $ENV{VCPKG_ROOT}/installed/${VCPKG_TARGET_TRIPLET}")
+        endif()
+        # VCPKG_INSTALLED_DIR is set by vcpkg toolchain
+        if(DEFINED VCPKG_INSTALLED_DIR)
+            list(PREPEND CMAKE_PREFIX_PATH "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+            message(STATUS "Added VCPKG_INSTALLED_DIR to CMAKE_PREFIX_PATH: ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+        endif()
     endif()
 
     # pthread

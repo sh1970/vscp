@@ -23,14 +23,17 @@ jobs:
       uses: lukka/run-vcpkg@v11
       with:
         vcpkgGitCommitId: '01f602195983451bc83e72f4214af2cbc495aa94'
+        runVcpkgInstall: true
 
-    - name: Install dependencies via vcpkg
-      run: |
-        vcpkg install openssl:x64-windows
-        vcpkg install pthreads:x64-windows
-        vcpkg install mosquitto:x64-windows
-        vcpkg install expat:x64-windows
-        vcpkg install dlfcn-win32:x64-windows
+    # Dependencies are installed automatically via vcpkg.json manifest
+    # If manifest mode fails, uncomment the explicit install below:
+    # - name: Install dependencies via vcpkg
+    #   run: |
+    #     vcpkg install openssl:x64-windows
+    #     vcpkg install pthreads:x64-windows
+    #     vcpkg install mosquitto:x64-windows
+    #     vcpkg install expat:x64-windows
+    #     vcpkg install dlfcn-win32:x64-windows
 
     - name: Configure CMake
       run: |
