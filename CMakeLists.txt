@@ -218,6 +218,21 @@ else()
 
     # Mosquitto lib
     include(FindMosquitto)
+
+    # On macOS, mosquitto depends on cJSON - find and include it
+    if(APPLE)
+        find_path(CJSON_INCLUDE_DIR cjson/cJSON.h
+            HINTS
+                /opt/homebrew/include
+                /usr/local/include
+                /opt/homebrew/opt/cjson/include
+                /usr/local/opt/cjson/include
+        )
+        if(CJSON_INCLUDE_DIR)
+            message(STATUS "cJSON include dir: ${CJSON_INCLUDE_DIR}")
+            include_directories(${CJSON_INCLUDE_DIR})
+        endif()
+    endif()
     
 endif(WIN32)
 
