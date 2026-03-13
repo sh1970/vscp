@@ -123,7 +123,7 @@ typedef struct _vscpEvent {
 
   uint8_t *pdata; /* Pointer to data. Max 512 bytes */
 
-  uint16_t crc; /* Used for UDP/Ethernet etc */
+  uint16_t crc; /* Rarely used */
 
 } vscpEvent;
 
@@ -185,9 +185,9 @@ typedef struct _vscpEventEx {
                           /* ~71 minutes before roll over */
                           /* If all zero set relative time on receiving end */
     };
-
-    uint16_t crc; /* Used for UDP/Ethernet etc */
   };
+
+  uint16_t crc; /* Rarely used */
 
   uint16_t vscp_class; /* VSCP class   */
   uint16_t vscp_type;  /* VSCP type    */
@@ -410,10 +410,10 @@ typedef VSCPChannelInfo *PVSCPCHANNELINFO;
 #define VSCP_MULTICAST_PACKET1_POS_HEAD           1
 #define VSCP_MULTICAST_PACKET1_POS_HEAD_MSB       1
 #define VSCP_MULTICAST_PACKET1_POS_HEAD_LSB       2
-#define VSCP_MULTICAST_PACKET1_POS_TIMESTAMP      3   /* 8-byte nanosecond timestamp */
-#define VSCP_MULTICAST_PACKET1_POS_RESERVED1      11  /* Reserved byte 1 */
-#define VSCP_MULTICAST_PACKET1_POS_RESERVED2      12  /* Reserved byte 2 */
-#define VSCP_MULTICAST_PACKET1_POS_RESERVED3      13  /* Reserved byte 3 */
+#define VSCP_MULTICAST_PACKET1_POS_TIMESTAMP      3  /* 8-byte nanosecond timestamp */
+#define VSCP_MULTICAST_PACKET1_POS_RESERVED1      11 /* Reserved byte 1 */
+#define VSCP_MULTICAST_PACKET1_POS_RESERVED2      12 /* Reserved byte 2 */
+#define VSCP_MULTICAST_PACKET1_POS_RESERVED3      13 /* Reserved byte 3 */
 #define VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS     14
 #define VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_MSB 14
 #define VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_LSB 15
@@ -432,7 +432,7 @@ typedef VSCPChannelInfo *PVSCPCHANNELINFO;
 /* VSCP multicast packet types */
 #define VSCP_MULTICAST_TYPE_EVENT0 0
 #define VSCP_MULTICAST_TYPE_EVENT1 1
-#define VSCP_MULTICAST_TYPE_EVENT  0  /* Legacy alias */
+#define VSCP_MULTICAST_TYPE_EVENT  0 /* Legacy alias */
 
 #define SET_VSCP_MULTICAST_TYPE(type, encryption)  ((type << 4) | encryption)
 #define GET_VSCP_MULTICAST_PACKET_TYPE(type)       ((type >> 4) & 0x0f)
