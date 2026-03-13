@@ -42,11 +42,27 @@
 #include <sys/types.h>
 
 #ifdef _WIN32
+#ifndef _WINSOCK_DEPRECATED_NO_WARNINGS
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
+#endif
 #include <io.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #define access _access_s
+// Windows alternative for timegm (converts struct tm to time_t in UTC)
+#define timegm _mkgmtime
+// Windows alternative for clock_gettime
+#ifndef CLOCK_REALTIME
+#define CLOCK_REALTIME 0
+#endif
+static inline int clock_gettime(int, struct timespec *ts) {
+    __int64 wintime;
+    GetSystemTimeAsFileTime((FILETIME*)&wintime);
+    wintime -= 116444736000000000LL;  // 1601 to 1970 epoch
+    ts->tv_sec = wintime / 10000000LL;
+    ts->tv_nsec = (wintime % 10000000LL) * 100;
+    return 0;
+}
 #else
 #include <arpa/inet.h>
 #include <dirent.h>
