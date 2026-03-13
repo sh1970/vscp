@@ -1,0 +1,45 @@
+name: Build and deploy on macOS
+
+on:
+  push:
+    branches: [ master, main, development ]
+  pull_request:
+    branches: [ master, main, development ]
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+
+    - name: Install dependencies via Homebrew
+      run: |
+        brew update
+        brew install openssl@3 mosquitto expat curl
+
+    - name: Configure CMake
+      run: |
+        cmake -B ${{github.workspace}}/build \
+          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+          -DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3) \
+          -DCMAKE_PREFIX_PATH="$(brew --prefix mosquitto);$(brew --prefix expat)"
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} -j$(sysctl -n hw.ncpu)
+
+    - name: Create package
+      working-directory: ${{github.workspace}}/build
+      run: cpack -G ZIP -C ${{env.BUILD_TYPE}}
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: vscpd-macos-x64
+        path: ${{github.workspace}}/build/*.zip
+        retention-days: 7
