@@ -388,10 +388,10 @@ vscp_almostEqualRelativeDouble(double A, double B, double maxRelDiff = DBL_EPSIL
   Read a numerical value from a string
   The string value can be set as a hex or a decimal value.
   @param strval String containing value to be converted
-  @return Unsigned long containing value
+  @return 64-bit signed integer containing value
 */
 
-int32_t
+int64_t
 vscp_readStringValue(const std::string &strval);
 
 /*!

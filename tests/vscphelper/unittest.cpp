@@ -1620,6 +1620,7 @@ TEST(VscpHelper, convertStringToEventEx)
 
 TEST(VscpHelper, convertEventToJSON_OriginalFrame)
 {
+    // Even with original frame format, JSON output always uses timestamp_ns
     vscpEvent event;
     memset(&event, 0, sizeof(event));
     
@@ -1633,7 +1634,7 @@ TEST(VscpHelper, convertEventToJSON_OriginalFrame)
     event.hour = 14;
     event.minute = 30;
     event.second = 45;
-    event.timestamp = 123456789;
+    event.timestamp = 123456789;  // microseconds
     memset(event.GUID, 0xAA, 16);
     event.sizeData = 2;
     event.pdata = new uint8_t[2]{0x11, 0x22};
@@ -1642,10 +1643,18 @@ TEST(VscpHelper, convertEventToJSON_OriginalFrame)
     EXPECT_TRUE(vscp_convertEventToJSON(strJSON, &event));
     EXPECT_FALSE(strJSON.empty());
     
-    // Should contain 32-bit timestamp value
-    EXPECT_NE(std::string::npos, strJSON.find("\"timestamp\": 123456789"));
+    // Should contain timestamp_ns in hex format (converted from date/time)
+    // 2026-03-12 14:30:45 UTC = 1773506445 seconds since epoch
+    // Plus 123456789 microseconds = 123456789000 nanoseconds
+    // Total: 1773506445 * 1e9 + 123456789 * 1e3 = 1773506445123456789000 ns
+    // But we just check it has timestamp_ns format
+    EXPECT_NE(std::string::npos, strJSON.find("\"timestamp_ns\": \"0x"));
     EXPECT_NE(std::string::npos, strJSON.find("\"class\": 10"));
     EXPECT_NE(std::string::npos, strJSON.find("\"type\": 6"));
+    // Head should have UNIX_NS frame version bit set
+    uint16_t expectedHead = (0x0003 & ~VSCP_HEADER16_FRAME_VERSION_MASK) | VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
+    std::string headStr = "\"head\": " + std::to_string(expectedHead);
+    EXPECT_NE(std::string::npos, strJSON.find(headStr));
     
     delete[] event.pdata;
 }
@@ -1668,8 +1677,9 @@ TEST(VscpHelper, convertEventToJSON_UnixNsFrame)
     EXPECT_TRUE(vscp_convertEventToJSON(strJSON, &event));
     EXPECT_FALSE(strJSON.empty());
     
-    // Should contain 64-bit nanosecond timestamp value
-    EXPECT_NE(std::string::npos, strJSON.find("\"timestamp\": 1234567890123456789"));
+    // Should contain 64-bit nanosecond timestamp in hex format
+    // 1234567890123456789 = 0x112210f47de98115
+    EXPECT_NE(std::string::npos, strJSON.find("\"timestamp_ns\": \"0x112210f47de98115\""));
     EXPECT_NE(std::string::npos, strJSON.find("\"class\": 20"));
     EXPECT_NE(std::string::npos, strJSON.find("\"type\": 10"));
     
@@ -1678,6 +1688,7 @@ TEST(VscpHelper, convertEventToJSON_UnixNsFrame)
 
 TEST(VscpHelper, convertEventExToJSON_OriginalFrame)
 {
+    // Even with original frame format, JSON output always uses timestamp_ns
     vscpEventEx eventEx;
     memset(&eventEx, 0, sizeof(eventEx));
     
@@ -1691,7 +1702,7 @@ TEST(VscpHelper, convertEventExToJSON_OriginalFrame)
     eventEx.hour = 14;
     eventEx.minute = 30;
     eventEx.second = 45;
-    eventEx.timestamp = 123456789;
+    eventEx.timestamp = 123456789;  // microseconds
     memset(eventEx.GUID, 0xAA, 16);
     eventEx.sizeData = 2;
     eventEx.data[0] = 0x11;
@@ -1701,10 +1712,14 @@ TEST(VscpHelper, convertEventExToJSON_OriginalFrame)
     EXPECT_TRUE(vscp_convertEventExToJSON(strJSON, &eventEx));
     EXPECT_FALSE(strJSON.empty());
     
-    // Should contain 32-bit timestamp value
-    EXPECT_NE(std::string::npos, strJSON.find("\"timestamp\": 123456789"));
+    // Should contain timestamp_ns in hex format (converted from date/time)
+    EXPECT_NE(std::string::npos, strJSON.find("\"timestamp_ns\": \"0x"));
     EXPECT_NE(std::string::npos, strJSON.find("\"class\": 10"));
     EXPECT_NE(std::string::npos, strJSON.find("\"type\": 6"));
+    // Head should have UNIX_NS frame version bit set
+    uint16_t expectedHead = (0x0003 & ~VSCP_HEADER16_FRAME_VERSION_MASK) | VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
+    std::string headStr = "\"head\": " + std::to_string(expectedHead);
+    EXPECT_NE(std::string::npos, strJSON.find(headStr));
 }
 
 TEST(VscpHelper, convertEventExToJSON_UnixNsFrame)
@@ -1727,14 +1742,16 @@ TEST(VscpHelper, convertEventExToJSON_UnixNsFrame)
     EXPECT_TRUE(vscp_convertEventExToJSON(strJSON, &eventEx));
     EXPECT_FALSE(strJSON.empty());
     
-    // Should contain 64-bit nanosecond timestamp value
-    EXPECT_NE(std::string::npos, strJSON.find("\"timestamp\": 1234567890123456789"));
+    // Should contain 64-bit nanosecond timestamp in hex format
+    // 1234567890123456789 = 0x112210f47de98115
+    EXPECT_NE(std::string::npos, strJSON.find("\"timestamp_ns\": \"0x112210f47de98115\""));
     EXPECT_NE(std::string::npos, strJSON.find("\"class\": 20"));
     EXPECT_NE(std::string::npos, strJSON.find("\"type\": 10"));
 }
 
 TEST(VscpHelper, convertJSONToEvent_OriginalFrame)
 {
+    // Even with old-format JSON (datetime + timestamp), output is always frame type 1
     std::string strJSON = R"({
         "head": 3,
         "obid": 42,
@@ -1752,10 +1769,16 @@ TEST(VscpHelper, convertJSONToEvent_OriginalFrame)
     
     EXPECT_TRUE(vscp_convertJSONToEvent(&event, strJSON));
     
-    // ORIGINAL frame version (0x0000) with priority bits
-    EXPECT_EQ(3, event.head);
+    // Always outputs UNIX_NS frame version - head should have UNIX_NS bit set
+    uint16_t expectedHead = (3 & ~VSCP_HEADER16_FRAME_VERSION_MASK) | VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
+    EXPECT_EQ(expectedHead, event.head);
     EXPECT_EQ(42, event.obid);
-    EXPECT_EQ(123456789, event.timestamp);
+    // Verify timestamp_ns is populated (converted from datetime + timestamp)
+    // Should be a reasonable 2026 epoch value (around 1.77e18 nanoseconds)
+    EXPECT_GT(event.timestamp_ns, 1700000000000000000ULL);  // After 2023
+    EXPECT_LT(event.timestamp_ns, 2000000000000000000ULL);  // Before 2033
+    EXPECT_EQ(0xffff, event.year);  // UNIX_NS marker
+    EXPECT_EQ(0xff, event.month);   // UNIX_NS marker
     EXPECT_EQ(10, event.vscp_class);
     EXPECT_EQ(6, event.vscp_type);
     EXPECT_EQ(2, event.sizeData);
@@ -1804,6 +1827,7 @@ TEST(VscpHelper, convertJSONToEvent_UnixNsFrame)
 
 TEST(VscpHelper, convertJSONToEventEx_OriginalFrame)
 {
+    // Even with old-format JSON (datetime + timestamp), output is always frame type 1
     std::string strJSON = R"({
         "head": 3,
         "obid": 42,
@@ -1820,10 +1844,16 @@ TEST(VscpHelper, convertJSONToEventEx_OriginalFrame)
     
     EXPECT_TRUE(vscp_convertJSONToEventEx(&eventEx, strJSON));
     
-    // ORIGINAL frame version (0x0000) with priority bits
-    EXPECT_EQ(3, eventEx.head);
+    // Always outputs UNIX_NS frame version - head should have UNIX_NS bit set
+    uint16_t expectedHead = (3 & ~VSCP_HEADER16_FRAME_VERSION_MASK) | VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
+    EXPECT_EQ(expectedHead, eventEx.head);
     EXPECT_EQ(42, eventEx.obid);
-    EXPECT_EQ(123456789, eventEx.timestamp);
+    // Verify timestamp_ns is populated (converted from datetime + timestamp)
+    // Should be a reasonable 2026 epoch value (around 1.77e18 nanoseconds)
+    EXPECT_GT(eventEx.timestamp_ns, 1700000000000000000ULL);  // After 2023
+    EXPECT_LT(eventEx.timestamp_ns, 2000000000000000000ULL);  // Before 2033
+    EXPECT_EQ(0xffff, eventEx.year);  // UNIX_NS marker
+    EXPECT_EQ(0xff, eventEx.month);   // UNIX_NS marker
     EXPECT_EQ(10, eventEx.vscp_class);
     EXPECT_EQ(6, eventEx.vscp_type);
     EXPECT_EQ(2, eventEx.sizeData);
@@ -1878,7 +1908,7 @@ TEST(VscpHelper, convertEventToXML_OriginalFrame)
     event.hour = 14;
     event.minute = 30;
     event.second = 45;
-    event.timestamp = 123456789;
+    event.timestamp = 123456789;  // microseconds
     memset(event.GUID, 0xAA, 16);
     event.sizeData = 2;
     event.pdata = new uint8_t[2]{0x11, 0x22};
@@ -1887,10 +1917,16 @@ TEST(VscpHelper, convertEventToXML_OriginalFrame)
     EXPECT_TRUE(vscp_convertEventToXML(strXML, &event));
     EXPECT_FALSE(strXML.empty());
     
-    // Should contain 32-bit timestamp value
-    EXPECT_NE(std::string::npos, strXML.find("timestamp=\"123456789\""));
+    // Should always output frame version 1 (UNIX_NS) with nanosecond timestamp
+    // head should have UNIX_NS bit set: (0x0003 & ~0x0F00) | 0x0100 = 0x0103 = 259
+    EXPECT_NE(std::string::npos, strXML.find("head=\"259\""));
     EXPECT_NE(std::string::npos, strXML.find("class=\"10\""));
     EXPECT_NE(std::string::npos, strXML.find("type=\"6\""));
+    // Timestamp should be nanoseconds (datetime converted + microseconds*1000)
+    // The timestamp value should be large (nanosecond scale)
+    EXPECT_NE(std::string::npos, strXML.find("timestamp="));
+    // Verify it's not the old 32-bit value
+    EXPECT_EQ(std::string::npos, strXML.find("timestamp=\"123456789\""));
     
     delete[] event.pdata;
 }
@@ -1936,7 +1972,7 @@ TEST(VscpHelper, convertEventExToXML_OriginalFrame)
     eventEx.hour = 14;
     eventEx.minute = 30;
     eventEx.second = 45;
-    eventEx.timestamp = 123456789;
+    eventEx.timestamp = 123456789;  // microseconds
     memset(eventEx.GUID, 0xAA, 16);
     eventEx.sizeData = 2;
     eventEx.data[0] = 0x11;
@@ -1946,10 +1982,15 @@ TEST(VscpHelper, convertEventExToXML_OriginalFrame)
     EXPECT_TRUE(vscp_convertEventExToXML(strXML, &eventEx));
     EXPECT_FALSE(strXML.empty());
     
-    // Should contain 32-bit timestamp value
-    EXPECT_NE(std::string::npos, strXML.find("timestamp=\"123456789\""));
+    // Should always output frame version 1 (UNIX_NS) with nanosecond timestamp
+    // head should have UNIX_NS bit set: (0x0003 & ~0x0F00) | 0x0100 = 0x0103 = 259
+    EXPECT_NE(std::string::npos, strXML.find("head=\"259\""));
     EXPECT_NE(std::string::npos, strXML.find("class=\"10\""));
     EXPECT_NE(std::string::npos, strXML.find("type=\"6\""));
+    // Timestamp should be nanoseconds (datetime converted + microseconds*1000)
+    EXPECT_NE(std::string::npos, strXML.find("timestamp="));
+    // Verify it's not the old 32-bit value
+    EXPECT_EQ(std::string::npos, strXML.find("timestamp=\"123456789\""));
 }
 
 TEST(VscpHelper, convertEventExToXML_UnixNsFrame)
@@ -2295,13 +2336,18 @@ TEST(VscpHelper, convertXMLToEvent_OriginalFrame)
                       "data=\"1,2,3,4,5\" />";
     
     EXPECT_TRUE(vscp_convertXMLToEvent(&event, xml));
-    EXPECT_EQ(0, event.head);
+    // Always produces frame type 1 (UNIX_NS)
+    EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_UNIX_NS, event.head & VSCP_HEADER16_FRAME_VERSION_MASK);
     EXPECT_EQ(123u, event.obid);
-    EXPECT_EQ(50817u, event.timestamp);
+    // Timestamp should be converted to nanoseconds (> year 2020 in nanoseconds)
+    EXPECT_GT(event.timestamp_ns, 1577836800000000000ULL);  // > 2020-01-01
+    EXPECT_LT(event.timestamp_ns, 2524608000000000000ULL);  // < 2050-01-01
     EXPECT_EQ(10, event.vscp_class);
     EXPECT_EQ(8, event.vscp_type);
     EXPECT_EQ(5, event.sizeData);
     EXPECT_EQ(0x02, event.GUID[15]);
+    EXPECT_EQ(0xffff, event.year);
+    EXPECT_EQ(0xff, event.month);
     
     if (event.pdata) {
         delete[] event.pdata;
@@ -2345,13 +2391,17 @@ TEST(VscpHelper, convertXMLToEventEx_OriginalFrame)
                       "data=\"1,2,3,4,5\" />";
     
     EXPECT_TRUE(vscp_convertXMLToEventEx(&eventEx, xml));
-    EXPECT_EQ(0, eventEx.head);
+    // Always produces frame type 1 (UNIX_NS)
+    EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_UNIX_NS, eventEx.head & VSCP_HEADER16_FRAME_VERSION_MASK);
     EXPECT_EQ(123u, eventEx.obid);
-    EXPECT_EQ(50817u, eventEx.timestamp);
+    // Timestamp should be converted to nanoseconds (> year 2020 in nanoseconds)
+    EXPECT_GT(eventEx.timestamp_ns, 1577836800000000000ULL);  // > 2020-01-01
+    EXPECT_LT(eventEx.timestamp_ns, 2524608000000000000ULL);  // < 2050-01-01
     EXPECT_EQ(10, eventEx.vscp_class);
     EXPECT_EQ(8, eventEx.vscp_type);
     EXPECT_EQ(5, eventEx.sizeData);
-    // GUID parsing validated in other tests
+    EXPECT_EQ(0xffff, eventEx.year);
+    EXPECT_EQ(0xff, eventEx.month);
 }
 
 TEST(VscpHelper, convertXMLToEventEx_UnixNsFrame)
@@ -2962,7 +3012,7 @@ TEST(VscpHelper, convertEventToString_OriginalFrame)
     event.vscp_class = 10;
     event.vscp_type = 6;
     event.obid = 123;
-    event.timestamp = 456789;
+    event.timestamp = 456789;  // microseconds
     event.year = 2024;
     event.month = 1;
     event.day = 15;
@@ -2978,8 +3028,11 @@ TEST(VscpHelper, convertEventToString_OriginalFrame)
     std::string str;
     EXPECT_TRUE(vscp_convertEventToString(str, &event));
     
-    // Verify string contains the 32-bit timestamp (456789)
-    EXPECT_NE(std::string::npos, str.find(",456789,"));
+    // Always outputs frame version 1 (UNIX_NS) with nanosecond timestamp
+    // Should NOT contain the old 32-bit timestamp format
+    EXPECT_EQ(std::string::npos, str.find(",456789,"));
+    // Head should have UNIX_NS bit set (256)
+    EXPECT_NE(std::string::npos, str.find("256,"));
     // Verify class and type
     EXPECT_NE(std::string::npos, str.find(",10,6,"));
 }
@@ -3151,12 +3204,14 @@ TEST(VscpHelper, convertStringToEventEx_NsTimestampWhenDatetimeEmpty)
 
 TEST(VscpHelper, writeEventToFrame_OriginalFormat)
 {
+    // Even with original frame format event, writeEventToFrame always writes 
+    // packet format 1 (UNIX_NS) with the date/time converted to nanoseconds
     vscpEvent event;
     memset(&event, 0, sizeof(event));
     event.head = VSCP_HEADER16_FRAME_VERSION_ORIGINAL;  // Original frame
     event.vscp_class = 10;
     event.vscp_type = 6;
-    event.timestamp = 123456789;
+    event.timestamp = 123456789;  // microseconds
     event.year = 2024;
     event.month = 1;
     event.day = 15;
@@ -3172,14 +3227,28 @@ TEST(VscpHelper, writeEventToFrame_OriginalFormat)
     
     EXPECT_TRUE(vscp_writeEventToFrame(frame, sizeof(frame), 0, &event));
     
-    // Verify packet type byte has type 0 in upper nibble
-    EXPECT_EQ(0, GET_VSCP_MULTICAST_PACKET_TYPE(frame[0]));
+    // Verify packet type byte has type 1 in upper nibble (always writes format 1)
+    EXPECT_EQ(VSCP_MULTICAST_TYPE_EVENT1, GET_VSCP_MULTICAST_PACKET_TYPE(frame[0]));
     
-    // Verify class/type positions for packet format 0
-    EXPECT_EQ(0, frame[VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_MSB]);
-    EXPECT_EQ(10, frame[VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_LSB]);
-    EXPECT_EQ(0, frame[VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_MSB]);
-    EXPECT_EQ(6, frame[VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_LSB]);
+    // Verify class/type positions for packet format 1
+    EXPECT_EQ(0, frame[VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_MSB]);
+    EXPECT_EQ(10, frame[VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_LSB]);
+    EXPECT_EQ(0, frame[VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_MSB]);
+    EXPECT_EQ(6, frame[VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_LSB]);
+    
+    // Verify the timestamp was converted from date/time to nanoseconds
+    // 2024-01-15 12:30:45 UTC = 1705321845 seconds since epoch
+    // Plus 123456789 microseconds = 123456789000 nanoseconds
+    uint64_t expectedNs = 1705321845ULL * 1000000000ULL + 123456789ULL * 1000ULL;
+    uint64_t readTs = ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP] << 56) |
+                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 1] << 48) |
+                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 2] << 40) |
+                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 3] << 32) |
+                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 4] << 24) |
+                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 5] << 16) |
+                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 6] << 8) |
+                      frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 7];
+    EXPECT_EQ(expectedNs, readTs);
     
     delete[] event.pdata;
 }

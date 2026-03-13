@@ -147,10 +147,10 @@ using json = nlohmann::json;
 ////////////////////////////////////////////////////////////////////////////////
 // vscp_readStringValue
 
-int32_t
+int64_t
 vscp_readStringValue(const std::string &strval)
 {
-  int32_t val     = 0;
+  int64_t val     = 0;
   std::string str = strval;
   vscp_makeLower(str);
   vscp_trim(str);
@@ -159,18 +159,18 @@ vscp_readStringValue(const std::string &strval)
     std::size_t pos;
     if (string::npos != (pos = str.find("0x"))) {
       str = str.substr(2);
-      val = std::stoul(str, &pos, 16);
+      val = std::stoll(str, &pos, 16);
     }
     else if (string::npos != (pos = str.find("0o"))) {
       str = str.substr(2);
-      val = std::stoul(str, &pos, 8);
+      val = std::stoll(str, &pos, 8);
     }
     else if (string::npos != (pos = str.find("0b"))) {
       str = str.substr(2);
-      val = std::stoul(str, &pos, 2);
+      val = std::stoll(str, &pos, 2);
     }
     else {
-      val = std::stoul(str);
+      val = std::stoll(str);
     }
   }
   catch (std::invalid_argument &) {
@@ -4953,6 +4953,9 @@ vscp_getDateStringFromEventEx(std::string &dt, const vscpEventEx *pEventEx)
 ////////////////////////////////////////////////////////////////////////////////////
 // vscp_convertEventToJSON
 //
+// Always outputs frame with timestamp_ns as hex string.
+// For original frame format, converts date/time fields to nanoseconds first.
+//
 
 bool
 vscp_convertEventToJSON(std::string &strJSON, const vscpEvent *pEvent)
@@ -4971,45 +4974,53 @@ vscp_convertEventToJSON(std::string &strJSON, const vscpEvent *pEvent)
   std::string dt;
   vscp_getDateStringFromEvent(dt, pEvent);
 
-  // Check frame version for timestamp handling
+  // Determine the nanosecond timestamp to use
+  uint64_t timestamp_ns;
   uint16_t frameVersion = pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK;
   
   if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
-    // UNIX_NS frame: use 64-bit nanosecond timestamp
-    strJSON = vscp_str_format("{\n"
-                              "\"head\": %d,\n"
-                              "\"obid\": %lu,\n"
-                              "\"datetime\": \"%s\",\n"
-                              "\"timestamp\": %llu,\n"
-                              "\"class\": %d,\n"
-                              "\"type\": %d,\n"
-                              "\"guid\": \"%s\",\n"
-                              "\"data\": [%s],\n"
-                              "\"note\": \"%s\"\n"
-                              "}",
-                              (unsigned short int) pEvent->head,
-                              (unsigned long) pEvent->obid,
-                              (const char *) dt.c_str(),
-                              (unsigned long long) pEvent->timestamp_ns,
-                              (unsigned short int) pEvent->vscp_class,
-                              (unsigned short int) pEvent->vscp_type,
-                              (const char *) strguid.c_str(),
-                              (const char *) strdata.c_str(),
-                              "");
+    // Already has nanosecond timestamp
+    timestamp_ns = pEvent->timestamp_ns;
   }
   else {
-    // ORIGINAL frame: use 32-bit timestamp
-    strJSON = vscp_str_format(VSCP_JSON_EVENT_TEMPLATE,
-                              (unsigned short int) pEvent->head,
-                              (unsigned long) pEvent->obid,
-                              (const char *) dt.c_str(),
-                              (unsigned long) pEvent->timestamp,
-                              (unsigned short int) pEvent->vscp_class,
-                              (unsigned short int) pEvent->vscp_type,
-                              (const char *) strguid.c_str(),
-                              (const char *) strdata.c_str(),
-                              "");
+    // Original frame format - convert date/time fields to nanoseconds
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+    tm.tm_year = pEvent->year - 1900;
+    tm.tm_mon  = pEvent->month - 1;
+    tm.tm_mday = pEvent->day;
+    tm.tm_hour = pEvent->hour;
+    tm.tm_min  = pEvent->minute;
+    tm.tm_sec  = pEvent->second;
+    time_t t = timegm(&tm);
+    // Convert to nanoseconds and add microsecond timestamp as microseconds
+    timestamp_ns = (uint64_t)t * 1000000000ULL + (uint64_t)pEvent->timestamp * 1000ULL;
   }
+
+  // Set head with UNIX_NS frame version
+  uint16_t head = (pEvent->head & ~VSCP_HEADER16_FRAME_VERSION_MASK) | VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
+
+  // Always output with timestamp_ns as hex string
+  strJSON = vscp_str_format("{\n"
+                            "\"head\": %d,\n"
+                            "\"obid\": %lu,\n"
+                            "\"datetime\": \"%s\",\n"
+                            "\"timestamp_ns\": \"0x%016llx\",\n"
+                            "\"class\": %d,\n"
+                            "\"type\": %d,\n"
+                            "\"guid\": \"%s\",\n"
+                            "\"data\": [%s],\n"
+                            "\"note\": \"%s\"\n"
+                            "}",
+                            (unsigned short int) head,
+                            (unsigned long) pEvent->obid,
+                            (const char *) dt.c_str(),
+                            (unsigned long long) timestamp_ns,
+                            (unsigned short int) pEvent->vscp_class,
+                            (unsigned short int) pEvent->vscp_type,
+                            (const char *) strguid.c_str(),
+                            (const char *) strdata.c_str(),
+                            "");
 
   return true;
 }
@@ -5030,6 +5041,7 @@ vscp_convertEventToJSON(std::string &strJSON, const vscpEvent *pEvent)
 // }
 //
 // All fields must exist except note which is ignored.
+// Always produces frame type 1 (UNIX_NS) with nanosecond timestamp.
 //
 
 bool
@@ -5048,11 +5060,13 @@ vscp_convertJSONToEvent(vscpEvent *pEvent, std::string &strJSON)
   try {
     auto j = json::parse(strJSON);
 
-    // head
+    // head - read from JSON but we'll set frame version to UNIX_NS
     pEvent->head = 0;
     if (j.contains("head") && j["head"].is_number_unsigned()) {
       pEvent->head = j.at("head").get<uint16_t>();
     }
+    // Always set frame version to UNIX_NS
+    pEvent->head = (pEvent->head & ~VSCP_HEADER16_FRAME_VERSION_MASK) | VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
 
     // obid
     pEvent->obid = 0;
@@ -5060,45 +5074,56 @@ vscp_convertJSONToEvent(vscpEvent *pEvent, std::string &strJSON)
       pEvent->obid = j.at("obid").get<uint32_t>();
     }
 
-    // timestamp - check frame version to determine if it's 32-bit or 64-bit
-    uint16_t frameVersion = pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK;
-    if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
-      // UNIX_NS frame: use 64-bit nanosecond timestamp
-      pEvent->timestamp_ns = 0;
-      if (j.contains("timestamp") && j["timestamp"].is_number_unsigned()) {
-        pEvent->timestamp_ns = j.at("timestamp").get<uint64_t>();
+    // Always use nanosecond timestamp (frame type 1)
+    pEvent->timestamp_ns = 0;
+    
+    // First check for timestamp_ns (preferred)
+    if (j.contains("timestamp_ns")) {
+      if (j["timestamp_ns"].is_string()) {
+        // Parse hex string (preferred format)
+        std::string tsStr = j.at("timestamp_ns").get<std::string>();
+        pEvent->timestamp_ns = (uint64_t)vscp_readStringValue(tsStr);
       }
-      // If timestamp_ns is zero, set current time in nanoseconds
-      if (!pEvent->timestamp_ns) {
-        struct timespec ts;
-        clock_gettime(CLOCK_REALTIME, &ts);
-        pEvent->timestamp_ns = (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+      else if (j["timestamp_ns"].is_number_unsigned()) {
+        pEvent->timestamp_ns = j.at("timestamp_ns").get<uint64_t>();
       }
-      pEvent->year = 0xffff;
-      pEvent->month = 0xff;
     }
-    else {
-      // ORIGINAL frame: use 32-bit timestamp
-      pEvent->timestamp = 0;
-      if (j.contains("timestamp") && j["timestamp"].is_number_unsigned()) {
-        pEvent->timestamp = j.at("timestamp").get<uint32_t>();
-      }
-      // If timestamp is zero set a timestamp here
-      if (!pEvent->timestamp) {
-        pEvent->timestamp = vscp_makeTimeStamp();
-      }
-
-      // datetime - if not set use current time
-      vscp_setEventToNow(pEvent);
-      if (j.contains("datetime") && j["datetime"].is_string()) {
-        std::string dtStr = j.at("datetime").get<std::string>();
-        struct tm tm;
-        memset(&tm, 0, sizeof(tm));
-        if (vscp_parseISOCombined(&tm, dtStr)) {
-          vscp_setEventDateTime(pEvent, &tm);
+    // If no timestamp_ns, check for datetime + timestamp (old format) and convert
+    else if (j.contains("datetime") && j["datetime"].is_string()) {
+      std::string dtStr = j.at("datetime").get<std::string>();
+      struct tm tm;
+      memset(&tm, 0, sizeof(tm));
+      if (vscp_parseISOCombined(&tm, dtStr)) {
+        time_t t = timegm(&tm);
+        pEvent->timestamp_ns = (uint64_t)t * 1000000000ULL;
+        // Add microsecond timestamp if present
+        if (j.contains("timestamp") && j["timestamp"].is_number_unsigned()) {
+          uint32_t usTimestamp = j.at("timestamp").get<uint32_t>();
+          pEvent->timestamp_ns += (uint64_t)usTimestamp * 1000ULL;
         }
       }
     }
+    // Fallback: use timestamp field as nanoseconds if it looks like one
+    else if (j.contains("timestamp") && j["timestamp"].is_number_unsigned()) {
+      uint64_t ts = j.at("timestamp").get<uint64_t>();
+      // If > 10^12, assume it's nanoseconds; otherwise assume microseconds
+      if (ts > 1000000000000ULL) {
+        pEvent->timestamp_ns = ts;
+      } else {
+        pEvent->timestamp_ns = ts * 1000ULL;
+      }
+    }
+    
+    // If timestamp_ns is still zero, set current time in nanoseconds
+    if (!pEvent->timestamp_ns) {
+      struct timespec ts;
+      clock_gettime(CLOCK_REALTIME, &ts);
+      pEvent->timestamp_ns = (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+    }
+    
+    // Mark as UNIX_NS frame
+    pEvent->year = 0xffff;
+    pEvent->month = 0xff;
 
     // VSCP class
     pEvent->vscp_class = 0;
@@ -5159,6 +5184,9 @@ vscp_convertJSONToEvent(vscpEvent *pEvent, std::string &strJSON)
 ////////////////////////////////////////////////////////////////////////////////////
 // vscp_convertEventExToJSON
 //
+// Always outputs frame with timestamp_ns as hex string.
+// For original frame format, converts date/time fields to nanoseconds first.
+//
 
 bool
 vscp_convertEventExToJSON(std::string &strJSON, const vscpEventEx *pEventEx)
@@ -5177,45 +5205,53 @@ vscp_convertEventExToJSON(std::string &strJSON, const vscpEventEx *pEventEx)
   std::string dt;
   vscp_getDateStringFromEventEx(dt, pEventEx);
 
-  // Check frame version for timestamp handling
+  // Determine the nanosecond timestamp to use
+  uint64_t timestamp_ns;
   uint16_t frameVersion = pEventEx->head & VSCP_HEADER16_FRAME_VERSION_MASK;
   
   if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
-    // UNIX_NS frame: use 64-bit nanosecond timestamp
-    strJSON = vscp_str_format("{\n"
-                              "\"head\": %d,\n"
-                              "\"obid\": %lu,\n"
-                              "\"datetime\": \"%s\",\n"
-                              "\"timestamp\": %llu,\n"
-                              "\"class\": %d,\n"
-                              "\"type\": %d,\n"
-                              "\"guid\": \"%s\",\n"
-                              "\"data\": [%s],\n"
-                              "\"note\": \"%s\"\n"
-                              "}",
-                              (unsigned short int) pEventEx->head,
-                              (unsigned long) pEventEx->obid,
-                              (const char *) dt.c_str(),
-                              (unsigned long long) pEventEx->timestamp_ns,
-                              (unsigned short int) pEventEx->vscp_class,
-                              (unsigned short int) pEventEx->vscp_type,
-                              (const char *) strguid.c_str(),
-                              (const char *) strdata.c_str(),
-                              "");
+    // Already has nanosecond timestamp
+    timestamp_ns = pEventEx->timestamp_ns;
   }
   else {
-    // ORIGINAL frame: use 32-bit timestamp
-    strJSON = vscp_str_format(VSCP_JSON_EVENT_TEMPLATE,
-                              (unsigned short int) pEventEx->head,
-                              (unsigned long) pEventEx->obid,
-                              (const char *) dt.c_str(),
-                              (unsigned long) pEventEx->timestamp,
-                              (unsigned short int) pEventEx->vscp_class,
-                              (unsigned short int) pEventEx->vscp_type,
-                              (const char *) strguid.c_str(),
-                              (const char *) strdata.c_str(),
-                              "");
+    // Original frame format - convert date/time fields to nanoseconds
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+    tm.tm_year = pEventEx->year - 1900;
+    tm.tm_mon  = pEventEx->month - 1;
+    tm.tm_mday = pEventEx->day;
+    tm.tm_hour = pEventEx->hour;
+    tm.tm_min  = pEventEx->minute;
+    tm.tm_sec  = pEventEx->second;
+    time_t t = timegm(&tm);
+    // Convert to nanoseconds and add microsecond timestamp as microseconds
+    timestamp_ns = (uint64_t)t * 1000000000ULL + (uint64_t)pEventEx->timestamp * 1000ULL;
   }
+
+  // Set head with UNIX_NS frame version
+  uint16_t head = (pEventEx->head & ~VSCP_HEADER16_FRAME_VERSION_MASK) | VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
+
+  // Always output with timestamp_ns as hex string
+  strJSON = vscp_str_format("{\n"
+                            "\"head\": %d,\n"
+                            "\"obid\": %lu,\n"
+                            "\"datetime\": \"%s\",\n"
+                            "\"timestamp_ns\": \"0x%016llx\",\n"
+                            "\"class\": %d,\n"
+                            "\"type\": %d,\n"
+                            "\"guid\": \"%s\",\n"
+                            "\"data\": [%s],\n"
+                            "\"note\": \"%s\"\n"
+                            "}",
+                            (unsigned short int) head,
+                            (unsigned long) pEventEx->obid,
+                            (const char *) dt.c_str(),
+                            (unsigned long long) timestamp_ns,
+                            (unsigned short int) pEventEx->vscp_class,
+                            (unsigned short int) pEventEx->vscp_type,
+                            (const char *) strguid.c_str(),
+                            (const char *) strdata.c_str(),
+                            "");
 
   return true;
 }
@@ -5251,11 +5287,13 @@ vscp_convertJSONToEventEx(vscpEventEx *pEventEx, std::string &strJSON)
 
     auto j = json::parse(strJSON);
 
-    // Head
+    // Head - read from JSON but we'll set frame version to UNIX_NS
     pEventEx->head = 0;
     if (j.contains("head") && j["head"].is_number_unsigned()) {
       pEventEx->head = j.at("head").get<uint16_t>();
     }
+    // Always set frame version to UNIX_NS
+    pEventEx->head = (pEventEx->head & ~VSCP_HEADER16_FRAME_VERSION_MASK) | VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
 
     // obid
     pEventEx->obid = 0;
@@ -5263,44 +5301,56 @@ vscp_convertJSONToEventEx(vscpEventEx *pEventEx, std::string &strJSON)
       pEventEx->obid = j.at("obid").get<uint32_t>();
     }
 
-    // timestamp - check frame version to determine if it's 32-bit or 64-bit
-    uint16_t frameVersion = pEventEx->head & VSCP_HEADER16_FRAME_VERSION_MASK;
-    if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
-      // UNIX_NS frame: use 64-bit nanosecond timestamp
-      pEventEx->timestamp_ns = 0;
-      if (j.contains("timestamp") && j["timestamp"].is_number_unsigned()) {
-        pEventEx->timestamp_ns = j.at("timestamp").get<uint64_t>();
+    // Always use nanosecond timestamp (frame type 1)
+    pEventEx->timestamp_ns = 0;
+    
+    // First check for timestamp_ns (preferred)
+    if (j.contains("timestamp_ns")) {
+      if (j["timestamp_ns"].is_string()) {
+        // Parse hex string (preferred format)
+        std::string tsStr = j.at("timestamp_ns").get<std::string>();
+        pEventEx->timestamp_ns = (uint64_t)vscp_readStringValue(tsStr);
       }
-      // If timestamp_ns is zero, set current time in nanoseconds
-      if (!pEventEx->timestamp_ns) {
-        struct timespec ts;
-        clock_gettime(CLOCK_REALTIME, &ts);
-        pEventEx->timestamp_ns = (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
-      }
-      pEventEx->year = 0xffff;
-      pEventEx->month = 0xff;
-    }
-    else {
-      // ORIGINAL frame: use 32-bit timestamp
-      pEventEx->timestamp = 0;
-      if (j.contains("timestamp") && j["timestamp"].is_number_unsigned()) {
-        pEventEx->timestamp = j.at("timestamp").get<uint32_t>();
-      }
-      // If timestamp is zero set a timestamp here
-      if (!pEventEx->timestamp) {
-        pEventEx->timestamp = vscp_makeTimeStamp();
-      }
-
-      // DateTime
-      vscp_setEventExToNow(pEventEx);
-      if (j.contains("datetime") && j["datetime"].is_string()) {
-        std::string dtStr = j.at("datetime").get<std::string>();
-        struct tm tm;
-        memset(&tm, 0, sizeof(tm));
-        vscp_parseISOCombined(&tm, dtStr);
-        vscp_setEventExDateTime(pEventEx, &tm);
+      else if (j["timestamp_ns"].is_number_unsigned()) {
+        pEventEx->timestamp_ns = j.at("timestamp_ns").get<uint64_t>();
       }
     }
+    // If no timestamp_ns, check for datetime + timestamp (old format) and convert
+    else if (j.contains("datetime") && j["datetime"].is_string()) {
+      std::string dtStr = j.at("datetime").get<std::string>();
+      struct tm tm;
+      memset(&tm, 0, sizeof(tm));
+      if (vscp_parseISOCombined(&tm, dtStr)) {
+        time_t t = timegm(&tm);
+        pEventEx->timestamp_ns = (uint64_t)t * 1000000000ULL;
+        // Add microsecond timestamp if present
+        if (j.contains("timestamp") && j["timestamp"].is_number_unsigned()) {
+          uint32_t usTimestamp = j.at("timestamp").get<uint32_t>();
+          pEventEx->timestamp_ns += (uint64_t)usTimestamp * 1000ULL;
+        }
+      }
+    }
+    // Fallback: use timestamp field as nanoseconds if it looks like one
+    else if (j.contains("timestamp") && j["timestamp"].is_number_unsigned()) {
+      uint64_t ts = j.at("timestamp").get<uint64_t>();
+      // If > 10^12, assume it's nanoseconds; otherwise assume microseconds
+      if (ts > 1000000000000ULL) {
+        pEventEx->timestamp_ns = ts;
+      } else {
+        pEventEx->timestamp_ns = ts * 1000ULL;
+      }
+    }
+    
+    // If timestamp_ns is still zero, set current time in nanoseconds
+    if (!pEventEx->timestamp_ns) {
+      struct timespec ts;
+      clock_gettime(CLOCK_REALTIME, &ts);
+      pEventEx->timestamp_ns = (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+    }
+    
+    // Mark as UNIX_NS frame
+    pEventEx->year = 0xffff;
+    pEventEx->month = 0xff;
 
     // VSCP class
     pEventEx->vscp_class = 0;
@@ -5355,6 +5405,9 @@ vscp_convertJSONToEventEx(vscpEventEx *pEventEx, std::string &strJSON)
 ////////////////////////////////////////////////////////////////////////////////////
 // vscp_convertEventToXML
 //
+// Always outputs frame version 1 (UNIX_NS) with nanosecond timestamp.
+// For original frame format, converts date/time fields to nanoseconds first.
+//
 
 bool
 vscp_convertEventToXML(std::string &strXML, vscpEvent *pEvent)
@@ -5374,42 +5427,51 @@ vscp_convertEventToXML(std::string &strXML, vscpEvent *pEvent)
   std::string dt;
   vscp_getDateStringFromEvent(dt, pEvent);
 
-  // Check frame version for timestamp handling
+  // Determine the nanosecond timestamp to use
+  uint64_t timestamp_ns;
   uint16_t frameVersion = pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK;
   
   if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
-    // UNIX_NS frame: use 64-bit nanosecond timestamp
-    strXML = vscp_str_format("<event "
-                             "head=\"%d\" "
-                             "obid=\"%lu\" "
-                             "datetime=\"%s\" "
-                             "timestamp=\"%llu\" "
-                             "class=\"%d\" "
-                             "type=\"%d\" "
-                             "guid=\"%s\" "
-                             "data=\"%s\" "
-                             "/>",
-                             (unsigned short int) pEvent->head,
-                             (unsigned long) pEvent->obid,
-                             (const char *) dt.c_str(),
-                             (unsigned long long) pEvent->timestamp_ns,
-                             (unsigned short int) pEvent->vscp_class,
-                             (unsigned short int) pEvent->vscp_type,
-                             (const char *) strguid.c_str(),
-                             (const char *) strdata.c_str());
+    // Already has nanosecond timestamp
+    timestamp_ns = pEvent->timestamp_ns;
   }
   else {
-    // ORIGINAL frame: use 32-bit timestamp
-    strXML = vscp_str_format(VSCP_XML_EVENT_TEMPLATE,
-                             (unsigned short int) pEvent->head,
-                             (unsigned long) pEvent->obid,
-                             (const char *) dt.c_str(),
-                             (unsigned long) pEvent->timestamp,
-                             (unsigned short int) pEvent->vscp_class,
-                             (unsigned short int) pEvent->vscp_type,
-                             (const char *) strguid.c_str(),
-                             (const char *) strdata.c_str());
+    // Original frame format - convert date/time fields to nanoseconds
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+    tm.tm_year = pEvent->year - 1900;
+    tm.tm_mon  = pEvent->month - 1;
+    tm.tm_mday = pEvent->day;
+    tm.tm_hour = pEvent->hour;
+    tm.tm_min  = pEvent->minute;
+    tm.tm_sec  = pEvent->second;
+    time_t t = timegm(&tm);
+    // Convert to nanoseconds and add microsecond timestamp as microseconds
+    timestamp_ns = (uint64_t)t * 1000000000ULL + (uint64_t)pEvent->timestamp * 1000ULL;
   }
+
+  // Set head with UNIX_NS frame version
+  uint16_t head = (pEvent->head & ~VSCP_HEADER16_FRAME_VERSION_MASK) | VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
+
+  // Always output with nanosecond timestamp
+  strXML = vscp_str_format("<event "
+                           "head=\"%d\" "
+                           "obid=\"%lu\" "
+                           "datetime=\"%s\" "
+                           "timestamp=\"%llu\" "
+                           "class=\"%d\" "
+                           "type=\"%d\" "
+                           "guid=\"%s\" "
+                           "data=\"%s\" "
+                           "/>",
+                           (unsigned short int) head,
+                           (unsigned long) pEvent->obid,
+                           (const char *) dt.c_str(),
+                           (unsigned long long) timestamp_ns,
+                           (unsigned short int) pEvent->vscp_class,
+                           (unsigned short int) pEvent->vscp_type,
+                           (const char *) strguid.c_str(),
+                           (const char *) strdata.c_str());
 
   return true;
 }
@@ -5432,6 +5494,8 @@ vscp_convertEventToXML(std::string &strXML, vscpEvent *pEvent)
 
 int depth_event_parser = 0;
 
+// Always produces frame type 1 (UNIX_NS) with nanosecond timestamp.
+// For original frame input, converts datetime + timestamp to nanoseconds.
 static void
 startEventXMLParser(void *data, const char *name, const char **attr)
 {
@@ -5447,9 +5511,12 @@ startEventXMLParser(void *data, const char *name, const char **attr)
 
   if ((0 == strcmp(name, "event")) && (0 == depth_event_parser)) {
 
-    // Store timestamp string for later processing (need to know frame version first)
+    // Store values for later processing
     std::string timestampStr;
     bool hasTimestamp = false;
+    struct tm parsedTm;
+    bool hasDatetime = false;
+    memset(&parsedTm, 0, sizeof(parsedTm));
 
     for (int i = 0; attr[i]; i += 2) {
 
@@ -5461,15 +5528,12 @@ startEventXMLParser(void *data, const char *name, const char **attr)
         pev->obid = vscp_readStringValue(attribute);
       }
       else if (0 == strcmp(attr[i], "datetime")) {
-        struct tm tm;
-        memset(&tm, 0, sizeof(tm));
         std::string dt = attribute;
-        if (vscp_parseISOCombined(&tm, dt)) {
-          vscp_setEventDateTime(pev, &tm);
+        if (vscp_parseISOCombined(&parsedTm, dt)) {
+          hasDatetime = true;
         }
       }
       else if (0 == strcmp(attr[i], "timestamp")) {
-        // Store for later - need to know frame version from head first
         timestampStr = attribute;
         hasTimestamp = true;
       }
@@ -5489,20 +5553,38 @@ startEventXMLParser(void *data, const char *name, const char **attr)
       }
     }
 
-    // Process timestamp based on frame version
+    // Always set frame version to UNIX_NS
+    pev->head = (pev->head & ~VSCP_HEADER16_FRAME_VERSION_MASK) | VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
+    pev->year = 0xffff;
+    pev->month = 0xff;
+
+    // Process timestamp - always produce nanosecond timestamp
+    uint16_t inputFrameVersion = pev->head & VSCP_HEADER16_FRAME_VERSION_MASK;
+    
     if (hasTimestamp) {
-      uint16_t frameVersion = pev->head & VSCP_HEADER16_FRAME_VERSION_MASK;
-      if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
-        // UNIX_NS frame: parse as 64-bit nanosecond timestamp
-        pev->timestamp_ns = std::stoull(timestampStr);
-        pev->year = 0xffff;
-        pev->month = 0xff;
+      // Check if input was UNIX_NS frame (large timestamp value indicates nanoseconds)
+      uint64_t tsValue = (uint64_t)vscp_readStringValue(timestampStr);
+      // If timestamp is larger than plausible microseconds (> year 2100 in us), treat as nanoseconds
+      if (tsValue > 4102444800000000ULL) {
+        // Already nanoseconds
+        pev->timestamp_ns = tsValue;
+      }
+      else if (hasDatetime) {
+        // Original frame: convert datetime + microsecond timestamp to nanoseconds
+        time_t t = timegm(&parsedTm);
+        pev->timestamp_ns = (uint64_t)t * 1000000000ULL + tsValue * 1000ULL;
       }
       else {
-        // ORIGINAL frame: parse as 32-bit timestamp
-        pev->timestamp = vscp_readStringValue(timestampStr);
+        // No datetime, treat timestamp as microseconds from epoch (unlikely but handle it)
+        pev->timestamp_ns = tsValue * 1000ULL;
       }
     }
+    else if (hasDatetime) {
+      // No timestamp, just datetime
+      time_t t = timegm(&parsedTm);
+      pev->timestamp_ns = (uint64_t)t * 1000000000ULL;
+    }
+    // else: keep default timestamp_ns from vscp_setEventToNow
   }
 
   depth_event_parser++;
@@ -5549,6 +5631,9 @@ vscp_convertXMLToEvent(vscpEvent *pEvent, std::string &strXML)
 ////////////////////////////////////////////////////////////////////////////////////
 // vscp_convertEventExToXML
 //
+// Always outputs frame version 1 (UNIX_NS) with nanosecond timestamp.
+// For original frame format, converts date/time fields to nanoseconds first.
+//
 
 bool
 vscp_convertEventExToXML(std::string &strXML, vscpEventEx *pEventEx)
@@ -5568,42 +5653,51 @@ vscp_convertEventExToXML(std::string &strXML, vscpEventEx *pEventEx)
   std::string dt;
   vscp_getDateStringFromEventEx(dt, pEventEx);
 
-  // Check frame version for timestamp handling
+  // Determine the nanosecond timestamp to use
+  uint64_t timestamp_ns;
   uint16_t frameVersion = pEventEx->head & VSCP_HEADER16_FRAME_VERSION_MASK;
   
   if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
-    // UNIX_NS frame: use 64-bit nanosecond timestamp
-    strXML = vscp_str_format("<event "
-                             "head=\"%d\" "
-                             "obid=\"%lu\" "
-                             "datetime=\"%s\" "
-                             "timestamp=\"%llu\" "
-                             "class=\"%d\" "
-                             "type=\"%d\" "
-                             "guid=\"%s\" "
-                             "data=\"%s\" "
-                             "/>",
-                             (unsigned short int) pEventEx->head,
-                             (unsigned long) pEventEx->obid,
-                             (const char *) dt.c_str(),
-                             (unsigned long long) pEventEx->timestamp_ns,
-                             (unsigned short int) pEventEx->vscp_class,
-                             (unsigned short int) pEventEx->vscp_type,
-                             (const char *) strguid.c_str(),
-                             (const char *) strdata.c_str());
+    // Already has nanosecond timestamp
+    timestamp_ns = pEventEx->timestamp_ns;
   }
   else {
-    // ORIGINAL frame: use 32-bit timestamp
-    strXML = vscp_str_format(VSCP_XML_EVENT_TEMPLATE,
-                             (unsigned short int) pEventEx->head,
-                             (unsigned long) pEventEx->obid,
-                             (const char *) dt.c_str(),
-                             (unsigned long) pEventEx->timestamp,
-                             (unsigned short int) pEventEx->vscp_class,
-                             (unsigned short int) pEventEx->vscp_type,
-                             (const char *) strguid.c_str(),
-                             (const char *) strdata.c_str());
+    // Original frame format - convert date/time fields to nanoseconds
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+    tm.tm_year = pEventEx->year - 1900;
+    tm.tm_mon  = pEventEx->month - 1;
+    tm.tm_mday = pEventEx->day;
+    tm.tm_hour = pEventEx->hour;
+    tm.tm_min  = pEventEx->minute;
+    tm.tm_sec  = pEventEx->second;
+    time_t t = timegm(&tm);
+    // Convert to nanoseconds and add microsecond timestamp as microseconds
+    timestamp_ns = (uint64_t)t * 1000000000ULL + (uint64_t)pEventEx->timestamp * 1000ULL;
   }
+
+  // Set head with UNIX_NS frame version
+  uint16_t head = (pEventEx->head & ~VSCP_HEADER16_FRAME_VERSION_MASK) | VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
+
+  // Always output with nanosecond timestamp
+  strXML = vscp_str_format("<event "
+                           "head=\"%d\" "
+                           "obid=\"%lu\" "
+                           "datetime=\"%s\" "
+                           "timestamp=\"%llu\" "
+                           "class=\"%d\" "
+                           "type=\"%d\" "
+                           "guid=\"%s\" "
+                           "data=\"%s\" "
+                           "/>",
+                           (unsigned short int) head,
+                           (unsigned long) pEventEx->obid,
+                           (const char *) dt.c_str(),
+                           (unsigned long long) timestamp_ns,
+                           (unsigned short int) pEventEx->vscp_class,
+                           (unsigned short int) pEventEx->vscp_type,
+                           (const char *) strguid.c_str(),
+                           (const char *) strdata.c_str());
 
   return true;
 }
@@ -5626,6 +5720,8 @@ vscp_convertEventExToXML(std::string &strXML, vscpEventEx *pEventEx)
 
 int depth_eventex_parser = 0;
 
+// Always produces frame type 1 (UNIX_NS) with nanosecond timestamp.
+// For original frame input, converts datetime + timestamp to nanoseconds.
 static void
 startEventExXMLParser(void *data, const char *name, const char **attr)
 {
@@ -5641,9 +5737,12 @@ startEventExXMLParser(void *data, const char *name, const char **attr)
 
   if ((0 == strcmp(name, "event")) && (0 == depth_eventex_parser)) {
 
-    // Store timestamp string for later processing (need to know frame version first)
+    // Store values for later processing
     std::string timestampStr;
     bool hasTimestamp = false;
+    struct tm parsedTm;
+    bool hasDatetime = false;
+    memset(&parsedTm, 0, sizeof(parsedTm));
 
     for (int i = 0; attr[i]; i += 2) {
 
@@ -5655,15 +5754,12 @@ startEventExXMLParser(void *data, const char *name, const char **attr)
         pex->obid = vscp_readStringValue(attribute);
       }
       else if (0 == strcmp(attr[i], "datetime")) {
-        struct tm tm;
-        memset(&tm, 0, sizeof(tm));
         std::string dt = attribute;
-        if (vscp_parseISOCombined(&tm, dt)) {
-          vscp_setEventExDateTime(pex, &tm);
+        if (vscp_parseISOCombined(&parsedTm, dt)) {
+          hasDatetime = true;
         }
       }
       else if (0 == strcmp(attr[i], "timestamp")) {
-        // Store for later - need to know frame version from head first
         timestampStr = attribute;
         hasTimestamp = true;
       }
@@ -5683,20 +5779,36 @@ startEventExXMLParser(void *data, const char *name, const char **attr)
       }
     }
 
-    // Process timestamp based on frame version
+    // Always set frame version to UNIX_NS
+    pex->head = (pex->head & ~VSCP_HEADER16_FRAME_VERSION_MASK) | VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
+    pex->year = 0xffff;
+    pex->month = 0xff;
+
+    // Process timestamp - always produce nanosecond timestamp
     if (hasTimestamp) {
-      uint16_t frameVersion = pex->head & VSCP_HEADER16_FRAME_VERSION_MASK;
-      if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
-        // UNIX_NS frame: parse as 64-bit nanosecond timestamp
-        pex->timestamp_ns = std::stoull(timestampStr);
-        pex->year = 0xffff;
-        pex->month = 0xff;
+      // Check if input was UNIX_NS frame (large timestamp value indicates nanoseconds)
+      uint64_t tsValue = (uint64_t)vscp_readStringValue(timestampStr);
+      // If timestamp is larger than plausible microseconds (> year 2100 in us), treat as nanoseconds
+      if (tsValue > 4102444800000000ULL) {
+        // Already nanoseconds
+        pex->timestamp_ns = tsValue;
+      }
+      else if (hasDatetime) {
+        // Original frame: convert datetime + microsecond timestamp to nanoseconds
+        time_t t = timegm(&parsedTm);
+        pex->timestamp_ns = (uint64_t)t * 1000000000ULL + tsValue * 1000ULL;
       }
       else {
-        // ORIGINAL frame: parse as 32-bit timestamp
-        pex->timestamp = vscp_readStringValue(timestampStr);
+        // No datetime, treat timestamp as microseconds from epoch (unlikely but handle it)
+        pex->timestamp_ns = tsValue * 1000ULL;
       }
     }
+    else if (hasDatetime) {
+      // No timestamp, just datetime
+      time_t t = timegm(&parsedTm);
+      pex->timestamp_ns = (uint64_t)t * 1000000000ULL;
+    }
+    // else: keep default timestamp_ns from vscp_setEventExToNow
   }
 
   depth_eventex_parser++;
@@ -5929,8 +6041,8 @@ vscp_parse_topic(const char *topic, uint8_t *pGuid[16], uint16_t *pVscpClass, ui
     return -1;
   }
 
-  *pVscpClass = (uint16_t) std::stoul(tokens[1]);
-  *pVscpType  = (uint16_t) std::stoul(tokens[2]);
+  *pVscpClass = (uint16_t) vscp_readStringValue(tokens[1]);
+  *pVscpType  = (uint16_t) vscp_readStringValue(tokens[2]);
 
   cguid guid;
   guid.getFromString(tokens[3]);
@@ -7357,7 +7469,10 @@ vscp_setEventExDateTimeBlockToNow(vscpEventEx *pEventEx)
 ///////////////////////////////////////////////////////////////////////////////
 // convertEventToString
 //
-// head,class,type,obid,datetime,timestamp,GUID,data1,data2,data3....
+// head,class,type,obid,timestamp_ns,GUID,data1,data2,data3....
+//
+// Always outputs frame version 1 (UNIX_NS) with nanosecond timestamp.
+// For original frame format, converts date/time fields to nanoseconds first.
 //
 
 bool
@@ -7368,31 +7483,39 @@ vscp_convertEventToString(std::string &str, const vscpEvent *pEvent)
     return false;
   }
 
-  std::string dt;
-  vscp_getDateStringFromEvent(dt, pEvent);
-
-  // Check frame version for timestamp handling
+  // Determine the nanosecond timestamp to use
+  uint64_t timestamp_ns;
   uint16_t frameVersion = pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK;
   
   if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
-    // UNIX_NS frame: use 64-bit nanosecond timestamp
-    str = vscp_str_format("%hu,%hu,%hu,%lu,%llu,",
-                          (unsigned short) pEvent->head,
-                          (unsigned short) pEvent->vscp_class,
-                          (unsigned short) pEvent->vscp_type,
-                          (unsigned long) pEvent->obid,
-                          (unsigned long long) pEvent->timestamp_ns);
+    // Already has nanosecond timestamp
+    timestamp_ns = pEvent->timestamp_ns;
   }
   else {
-    // ORIGINAL frame: use 32-bit timestamp
-    str = vscp_str_format("%hu,%hu,%hu,%lu,%s,%lu,",
-                          (unsigned short) pEvent->head,
-                          (unsigned short) pEvent->vscp_class,
-                          (unsigned short) pEvent->vscp_type,
-                          (unsigned long) pEvent->obid,
-                          (const char *) dt.c_str(),
-                          (unsigned long) pEvent->timestamp);
+    // Original frame format - convert date/time fields to nanoseconds
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+    tm.tm_year = pEvent->year - 1900;
+    tm.tm_mon  = pEvent->month - 1;
+    tm.tm_mday = pEvent->day;
+    tm.tm_hour = pEvent->hour;
+    tm.tm_min  = pEvent->minute;
+    tm.tm_sec  = pEvent->second;
+    time_t t = timegm(&tm);
+    // Convert to nanoseconds and add microsecond timestamp as microseconds
+    timestamp_ns = (uint64_t)t * 1000000000ULL + (uint64_t)pEvent->timestamp * 1000ULL;
   }
+
+  // Set head with UNIX_NS frame version
+  uint16_t head = (pEvent->head & ~VSCP_HEADER16_FRAME_VERSION_MASK) | VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
+
+  // Always output with nanosecond timestamp
+  str = vscp_str_format("%hu,%hu,%hu,%lu,%llu,",
+                        (unsigned short) head,
+                        (unsigned short) pEvent->vscp_class,
+                        (unsigned short) pEvent->vscp_type,
+                        (unsigned long) pEvent->obid,
+                        (unsigned long long) timestamp_ns);
 
   std::string strGUID;
   vscp_writeGuidToString(strGUID, pEvent);
@@ -7780,7 +7903,8 @@ vscp_getFrameSizeFromEventEx(vscpEventEx *pEventEx)
 ////////////////////////////////////////////////////////////////////////////////
 // vscp_writeEventToFrame
 //
-// Uses packet format 0 for original frame version and packet format 1 for UNIX_NS frame version.
+// Always writes packet format 1 (UNIX_NS frame version) with nanosecond timestamp.
+// If event has original frame format (version 0), converts date/time fields to nanoseconds first.
 //
 
 bool
@@ -7800,125 +7924,86 @@ vscp_writeEventToFrame(uint8_t *frame, size_t len, uint8_t pkttype, const vscpEv
     return false;
   }
 
-  // Check frame version
+  // Always write packet format 1 - UNIX_NS nanosecond timestamp
+  size_t calcSize = 1 +                                                          // Packet type
+                    VSCP_MULTICAST_PACKET1_HEADER_LENGTH + pEvent->sizeData + 2; // CRC
+
+  if (len < calcSize) {
+    return false;
+  }
+
+  // Determine the nanosecond timestamp to use
+  uint64_t timestamp_ns;
   uint16_t frameVersion = pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK;
-
+  
   if (VSCP_HEADER16_FRAME_VERSION_UNIX_NS == frameVersion) {
-    // Packet format 1 - UNIX_NS nanosecond timestamp
-    size_t calcSize = 1 +                                                          // Packet type
-                      VSCP_MULTICAST_PACKET1_HEADER_LENGTH + pEvent->sizeData + 2; // CRC
-
-    if (len < calcSize) {
-      return false;
-    }
-
-    // Frame type - set packet type 1 in upper nibble
-    frame[VSCP_MULTICAST_PACKET1_POS_PKTTYPE] = (pkttype & 0x0f) | (VSCP_MULTICAST_TYPE_EVENT1 << 4);
-
-    // Header
-    frame[VSCP_MULTICAST_PACKET1_POS_HEAD_MSB] = (pEvent->head >> 8) & 0xff;
-    frame[VSCP_MULTICAST_PACKET1_POS_HEAD_LSB] = pEvent->head & 0xff;
-
-    // 8-byte nanosecond timestamp
-    frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP]     = (pEvent->timestamp_ns >> 56) & 0xff;
-    frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 1] = (pEvent->timestamp_ns >> 48) & 0xff;
-    frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 2] = (pEvent->timestamp_ns >> 40) & 0xff;
-    frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 3] = (pEvent->timestamp_ns >> 32) & 0xff;
-    frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 4] = (pEvent->timestamp_ns >> 24) & 0xff;
-    frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 5] = (pEvent->timestamp_ns >> 16) & 0xff;
-    frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 6] = (pEvent->timestamp_ns >> 8) & 0xff;
-    frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 7] = pEvent->timestamp_ns & 0xff;
-
-    // Reserved bytes (set to 0)
-    frame[VSCP_MULTICAST_PACKET1_POS_RESERVED1] = 0;
-    frame[VSCP_MULTICAST_PACKET1_POS_RESERVED2] = 0;
-    frame[VSCP_MULTICAST_PACKET1_POS_RESERVED3] = 0;
-
-    // Class
-    frame[VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_MSB] = (pEvent->vscp_class >> 8) & 0xff;
-    frame[VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_LSB] = pEvent->vscp_class & 0xff;
-
-    // Type
-    frame[VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_MSB] = (pEvent->vscp_type >> 8) & 0xff;
-    frame[VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_LSB] = pEvent->vscp_type & 0xff;
-
-    // GUID
-    memcpy(frame + VSCP_MULTICAST_PACKET1_POS_VSCP_GUID, pEvent->GUID, 16);
-
-    // Size
-    frame[VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE_MSB] = (pEvent->sizeData >> 8) & 0xff;
-    frame[VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE_LSB] = pEvent->sizeData & 0xff;
-
-    // Data
-    if (pEvent->sizeData) {
-      memcpy(frame + VSCP_MULTICAST_PACKET1_POS_VSCP_DATA, pEvent->pdata, pEvent->sizeData);
-    }
-
-    // Calculate CRC
-    crc framecrc = crcFast((unsigned char const *) frame + 1, VSCP_MULTICAST_PACKET1_HEADER_LENGTH + pEvent->sizeData);
-
-    // CRC
-    frame[1 + VSCP_MULTICAST_PACKET1_HEADER_LENGTH + pEvent->sizeData]     = (framecrc >> 8) & 0xff;
-    frame[1 + VSCP_MULTICAST_PACKET1_HEADER_LENGTH + pEvent->sizeData + 1] = framecrc & 0xff;
+    // Already has nanosecond timestamp
+    timestamp_ns = pEvent->timestamp_ns;
   }
   else {
-    // Packet format 0 - Original frame with microsecond timestamp and datetime fields
-    size_t calcSize = 1 +                                                          // Packet type
-                      VSCP_MULTICAST_PACKET0_HEADER_LENGTH + pEvent->sizeData + 2; // CRC
-
-    if (len < calcSize) {
-      return false;
-    }
-
-    // Frame type
-    frame[VSCP_MULTICAST_PACKET0_POS_PKTTYPE] = pkttype;
-
-    // Header
-    frame[VSCP_MULTICAST_PACKET0_POS_HEAD_MSB] = (pEvent->head >> 8) & 0xff;
-    frame[VSCP_MULTICAST_PACKET0_POS_HEAD_LSB] = pEvent->head & 0xff;
-
-    // Timestamp
-    frame[VSCP_MULTICAST_PACKET0_POS_TIMESTAMP]     = (pEvent->timestamp >> 24) & 0xff;
-    frame[VSCP_MULTICAST_PACKET0_POS_TIMESTAMP + 1] = (pEvent->timestamp >> 16) & 0xff;
-    frame[VSCP_MULTICAST_PACKET0_POS_TIMESTAMP + 2] = (pEvent->timestamp >> 8) & 0xff;
-    frame[VSCP_MULTICAST_PACKET0_POS_TIMESTAMP + 3] = pEvent->timestamp & 0xff;
-
-    // Date / time block GMT
-    frame[VSCP_MULTICAST_PACKET0_POS_YEAR_MSB] = (pEvent->year >> 8) & 0xff;
-    frame[VSCP_MULTICAST_PACKET0_POS_YEAR_LSB] = pEvent->year & 0xff;
-    frame[VSCP_MULTICAST_PACKET0_POS_MONTH]    = pEvent->month;
-    frame[VSCP_MULTICAST_PACKET0_POS_DAY]      = pEvent->day;
-    frame[VSCP_MULTICAST_PACKET0_POS_HOUR]     = pEvent->hour;
-    frame[VSCP_MULTICAST_PACKET0_POS_MINUTE]   = pEvent->minute;
-    frame[VSCP_MULTICAST_PACKET0_POS_SECOND]   = pEvent->second;
-
-    // Class
-    frame[VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_MSB] = (pEvent->vscp_class >> 8) & 0xff;
-    frame[VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_LSB] = pEvent->vscp_class & 0xff;
-
-    // Type
-    frame[VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_MSB] = (pEvent->vscp_type >> 8) & 0xff;
-    frame[VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_LSB] = pEvent->vscp_type & 0xff;
-
-    // GUID
-    memcpy(frame + VSCP_MULTICAST_PACKET0_POS_VSCP_GUID, pEvent->GUID, 16);
-
-    // Size
-    frame[VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_MSB] = (pEvent->sizeData >> 8) & 0xff;
-    frame[VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_LSB] = pEvent->sizeData & 0xff;
-
-    // Data
-    if (pEvent->sizeData) {
-      memcpy(frame + VSCP_MULTICAST_PACKET0_POS_VSCP_DATA, pEvent->pdata, pEvent->sizeData);
-    }
-
-    // Calculate CRC
-    crc framecrc = crcFast((unsigned char const *) frame + 1, VSCP_MULTICAST_PACKET0_HEADER_LENGTH + pEvent->sizeData);
-
-    // CRC
-    frame[1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH + pEvent->sizeData]     = (framecrc >> 8) & 0xff;
-    frame[1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH + pEvent->sizeData + 1] = framecrc & 0xff;
+    // Original frame format - convert date/time fields to nanoseconds
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+    tm.tm_year = pEvent->year - 1900;
+    tm.tm_mon  = pEvent->month - 1;
+    tm.tm_mday = pEvent->day;
+    tm.tm_hour = pEvent->hour;
+    tm.tm_min  = pEvent->minute;
+    tm.tm_sec  = pEvent->second;
+    time_t t = timegm(&tm);
+    // Convert to nanoseconds and add microsecond timestamp as microseconds
+    timestamp_ns = (uint64_t)t * 1000000000ULL + (uint64_t)pEvent->timestamp * 1000ULL;
   }
+
+  // Frame type - set packet type 1 in upper nibble
+  frame[VSCP_MULTICAST_PACKET1_POS_PKTTYPE] = (pkttype & 0x0f) | (VSCP_MULTICAST_TYPE_EVENT1 << 4);
+
+  // Header - set frame version bit to UNIX_NS
+  uint16_t head = (pEvent->head & ~VSCP_HEADER16_FRAME_VERSION_MASK) | VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
+  frame[VSCP_MULTICAST_PACKET1_POS_HEAD_MSB] = (head >> 8) & 0xff;
+  frame[VSCP_MULTICAST_PACKET1_POS_HEAD_LSB] = head & 0xff;
+
+  // 8-byte nanosecond timestamp
+  frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP]     = (timestamp_ns >> 56) & 0xff;
+  frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 1] = (timestamp_ns >> 48) & 0xff;
+  frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 2] = (timestamp_ns >> 40) & 0xff;
+  frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 3] = (timestamp_ns >> 32) & 0xff;
+  frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 4] = (timestamp_ns >> 24) & 0xff;
+  frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 5] = (timestamp_ns >> 16) & 0xff;
+  frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 6] = (timestamp_ns >> 8) & 0xff;
+  frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 7] = timestamp_ns & 0xff;
+
+  // Reserved bytes (set to 0)
+  frame[VSCP_MULTICAST_PACKET1_POS_RESERVED1] = 0;
+  frame[VSCP_MULTICAST_PACKET1_POS_RESERVED2] = 0;
+  frame[VSCP_MULTICAST_PACKET1_POS_RESERVED3] = 0;
+
+  // Class
+  frame[VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_MSB] = (pEvent->vscp_class >> 8) & 0xff;
+  frame[VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_LSB] = pEvent->vscp_class & 0xff;
+
+  // Type
+  frame[VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_MSB] = (pEvent->vscp_type >> 8) & 0xff;
+  frame[VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_LSB] = pEvent->vscp_type & 0xff;
+
+  // GUID
+  memcpy(frame + VSCP_MULTICAST_PACKET1_POS_VSCP_GUID, pEvent->GUID, 16);
+
+  // Size
+  frame[VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE_MSB] = (pEvent->sizeData >> 8) & 0xff;
+  frame[VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE_LSB] = pEvent->sizeData & 0xff;
+
+  // Data
+  if (pEvent->sizeData) {
+    memcpy(frame + VSCP_MULTICAST_PACKET1_POS_VSCP_DATA, pEvent->pdata, pEvent->sizeData);
+  }
+
+  // Calculate CRC
+  crc framecrc = crcFast((unsigned char const *) frame + 1, VSCP_MULTICAST_PACKET1_HEADER_LENGTH + pEvent->sizeData);
+
+  // CRC
+  frame[1 + VSCP_MULTICAST_PACKET1_HEADER_LENGTH + pEvent->sizeData]     = (framecrc >> 8) & 0xff;
+  frame[1 + VSCP_MULTICAST_PACKET1_HEADER_LENGTH + pEvent->sizeData + 1] = framecrc & 0xff;
 
 #if 0
     printf("CRC1 %02X %02X\n",
