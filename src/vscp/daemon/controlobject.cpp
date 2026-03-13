@@ -45,6 +45,10 @@
 #include <linux/if_packet.h>
 #include <linux/sockios.h>
 #endif
+#ifdef __APPLE__
+#include <ifaddrs.h>
+#include <net/if_dl.h>
+#endif
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <netdb.h>
@@ -1444,6 +1448,61 @@ CControlObject::getMacAddress(cguid &guid)
   //     }
   // }
 
+  return rv;
+
+#elif defined(__APPLE__)
+  // macOS implementation using getifaddrs
+  bool rv = false;
+  struct ifaddrs *iflist, *cur;
+  
+  // Clear the GUID
+  guid.clear();
+  
+  if (getifaddrs(&iflist) == 0) {
+    for (cur = iflist; cur; cur = cur->ifa_next) {
+      if ((cur->ifa_addr->sa_family == AF_LINK) && cur->ifa_addr) {
+        struct sockaddr_dl *sdl = (struct sockaddr_dl *)cur->ifa_addr;
+        if (sdl->sdl_alen == 6) {
+          unsigned char *mac = (unsigned char *)LLADDR(sdl);
+          // Skip loopback and other non-ethernet interfaces
+          if (mac[0] == 0 && mac[1] == 0 && mac[2] == 0 &&
+              mac[3] == 0 && mac[4] == 0 && mac[5] == 0) {
+            continue;
+          }
+          
+          if (gDebugLevel & VSCP_DEBUG_EXTRA) {
+            spdlog::debug("Ethernet MAC address: {:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+                          mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+          }
+          
+          guid.setAt(0, 0xff);
+          guid.setAt(1, 0xff);
+          guid.setAt(2, 0xff);
+          guid.setAt(3, 0xff);
+          guid.setAt(4, 0xff);
+          guid.setAt(5, 0xff);
+          guid.setAt(6, 0xff);
+          guid.setAt(7, 0xfe);
+          guid.setAt(8, mac[0]);
+          guid.setAt(9, mac[1]);
+          guid.setAt(10, mac[2]);
+          guid.setAt(11, mac[3]);
+          guid.setAt(12, mac[4]);
+          guid.setAt(13, mac[5]);
+          guid.setAt(14, 0);
+          guid.setAt(15, 0);
+          rv = true;
+          break;
+        }
+      }
+    }
+    freeifaddrs(iflist);
+  }
+  
+  if (!rv) {
+    spdlog::error("Failed to get hardware address.");
+  }
+  
   return rv;
 
 #else
