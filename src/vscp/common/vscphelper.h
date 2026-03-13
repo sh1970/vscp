@@ -37,7 +37,14 @@
 #define VSCPHELPER_H__INCLUDED_
 
 #ifndef WIN32
+#ifdef __linux__
 #include <byteswap.h>
+#elif defined(__APPLE__)
+#include <libkern/OSByteOrder.h>
+#define bswap_16(x) OSSwapInt16(x)
+#define bswap_32(x) OSSwapInt32(x)
+#define bswap_64(x) OSSwapInt64(x)
+#endif
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/times.h>

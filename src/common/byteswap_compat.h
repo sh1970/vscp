@@ -19,6 +19,13 @@ static inline uint64_t bswap_64(uint64_t x) {
     return _byteswap_uint64(x);
 }
 
+#elif defined(__APPLE__)
+// macOS byteswap compatibility
+#include <libkern/OSByteOrder.h>
+#define bswap_16(x) OSSwapInt16(x)
+#define bswap_32(x) OSSwapInt32(x)
+#define bswap_64(x) OSSwapInt64(x)
+
 #else
 // Unix/Linux - use the standard header
 #include <byteswap.h>

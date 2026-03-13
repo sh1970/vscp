@@ -40,9 +40,11 @@
 
 #ifndef WIN32
 #include <arpa/inet.h>
+#ifdef __linux__
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
 #include <linux/sockios.h>
+#endif
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <netdb.h>
