@@ -74,6 +74,8 @@ typedef struct _vscpEvent {
       Bit 13 - GUID type
       Bit 12 - GUID type
 
+      Bit 10-11 - Reserved
+
       Bit 8-9 - Frame version. (0 = original, 1 = frame with Unix ns timestamp, 2 = reserved, 3 = reserved)
       Bit 10-11 = Reserved
       Bit 765 =  priority, Priority 0-7 where 0 is highest priority.
@@ -143,6 +145,8 @@ typedef struct _vscpEventEx {
       Bit 14 - GUID type
       Bit 13 - GUID type
       Bit 12 - GUID type
+
+      Bit 10-11 - Reserved
 
       Bit 8-9 - Frame version. (0 = original, 1 = frame with Unix ns timestamp, 2 = reserved, 3 = reserved)
       Bit 765 =  priority, Priority 0-7 where 0 is highest priority.
@@ -219,23 +223,23 @@ typedef vscpEventEx *PVSCPEVENTEX;
 
 #define VSCP_NO_CRC_CALC 0x08 /* If set no CRC is calculated */
 
-#define VSCP_HEADER16_DUMB      0x8000 /* This node is dumb */
-#define VSCP_HEADER16_IPV6_GUID 0x1000 /* GUID is IPv6 address */
+#define VSCP_HEADER16_DUMB      0x8000u /* This node is dumb */
+#define VSCP_HEADER16_IPV6_GUID 0x1000u /* GUID is IPv6 address */
 
 /* Bits 14/13/12 for GUID type */
-#define VSCP_HEADER16_GUID_TYPE_STANDARD 0x0000 /* VSCP standard GUID */
-#define VSCP_HEADER16_GUID_TYPE_IPV6     0x1000 /* GUID is IPv6 address */
+#define VSCP_HEADER16_GUID_TYPE_STANDARD 0x0000u /* VSCP standard GUID */
+#define VSCP_HEADER16_GUID_TYPE_IPV6     0x1000u /* GUID is IPv6 address */
 /* https://www.sohamkamani.com/blog/2016/10/05/uuid1-vs-uuid4/ */
-#define VSCP_HEADER16_GUID_TYPE_RFC4122V1 0x2000 /* GUID is RFC 4122 Version 1 */
-#define VSCP_HEADER16_GUID_TYPE_RFC4122V4 0x3000 /* GUID is RFC 4122 Version 4 */
-#define VSCP_HEADER16_GUID_TYPE_RANDOM    0x4000 /* GUID is random number (not recommended) */
+#define VSCP_HEADER16_GUID_TYPE_RFC4122V1 0x2000u /* GUID is RFC 4122 Version 1 */
+#define VSCP_HEADER16_GUID_TYPE_RFC4122V4 0x3000u /* GUID is RFC 4122 Version 4 */
+#define VSCP_HEADER16_GUID_TYPE_RANDOM    0x4000u /* GUID is random number (not recommended) */
 
 // Frame version bits (8-9)
-#define VSCP_HEADER16_FRAME_VERSION_MASK     0x0300
-#define VSCP_HEADER16_FRAME_VERSION_ORIGINAL 0x0000 /* Original frame format */
-#define VSCP_HEADER16_FRAME_VERSION_UNIX_NS  0x0100 /* Frame with Unix timestamp with nanosecond precision */
-#define VSCP_HEADER16_FRAME_VERSION_2        0x0200 /* Reserved */
-#define VSCP_HEADER16_FRAME_VERSION_3        0x0300 /* Reserved */
+#define VSCP_HEADER16_FRAME_VERSION_MASK     0x0300u
+#define VSCP_HEADER16_FRAME_VERSION_ORIGINAL 0x0000u /* Original frame format */
+#define VSCP_HEADER16_FRAME_VERSION_UNIX_NS  0x0100u /* Frame with Unix timestamp with nanosecond precision */
+#define VSCP_HEADER16_FRAME_VERSION_2        0x0200u /* Reserved */
+#define VSCP_HEADER16_FRAME_VERSION_3        0x0300u /* Reserved */
 
 #define VSCP_MASK_PRIORITY  0xE0
 #define VSCP_MASK_GUID_TYPE 0x8000
@@ -249,7 +253,7 @@ typedef vscpEventEx *PVSCPEVENTEX;
                                          /* should be set to this value for the CRC  */
                                          /* calculation to be skipped. */
 
-#define VSCP_CAN_ID_HARD_CODED 0x02000000 /* Hard coded bit in CAN frame id */
+#define VSCP_CAN_ID_HARD_CODED 0x02000000u /* Hard coded bit in CAN frame id */
 
 /* GUID byte positions */
 #define VSCP_GUID_MSB 0

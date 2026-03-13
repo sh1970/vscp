@@ -4692,7 +4692,7 @@ vscp_copyEventEx(vscpEventEx *pEventExTo, const vscpEventEx *pEventExFrom)
 //
 
 bool
-vscp_newEvent(vscpEvent **ppEvent)
+vscp_newEvent(vscpEvent **ppEvent, uint16_t frameVersion)
 {
   *ppEvent = new vscpEvent;
   if (nullptr == *ppEvent) {
@@ -4700,8 +4700,28 @@ vscp_newEvent(vscpEvent **ppEvent)
   }
 
   // No data allocated yet
+  (*ppEvent)->head = frameVersion;
   (*ppEvent)->sizeData = 0;
   (*ppEvent)->pdata    = nullptr;
+
+  return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////////
+// vscp_newEventEx
+//
+
+bool
+vscp_newEventEx(vscpEventEx **ppEventEx, uint16_t version)
+{
+  *ppEventEx = new vscpEventEx;
+  if (nullptr == *ppEventEx) {
+    return false;
+  }
+
+  // No data allocated yet
+  (*ppEventEx)->head = version;
+  (*ppEventEx)->sizeData = 0;
 
   return true;
 }
@@ -4722,6 +4742,24 @@ vscp_deleteEvent(vscpEvent *pEvent)
     delete[] pEvent->pdata;
     pEvent->pdata = nullptr;
   }
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////
+// deleteVSCPevent
+//
+
+void
+vscp_deleteEventEx(vscpEventEx **ppex)
+{
+  // Check pointer
+  if (nullptr == *ppex) {
+    return;
+  }
+
+  // Delete the event and mark it as unused.
+  delete *ppex;
+  *ppex = nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -4751,6 +4789,46 @@ void
 vscp_deleteEventEx(vscpEventEx *pEventEx)
 {
   delete pEventEx;
+}
+
+////////////////////////////////////////////////////////////////////////////////////
+// setFrameVersion
+//
+
+bool
+setFrameVersion(vscpEvent *pEvent, uint16_t version)
+{
+  if (nullptr == pEvent) {
+    return false;
+  }
+
+  // Clear existing frame version bits
+  pEvent->head &= ~VSCP_HEADER16_FRAME_VERSION_MASK;
+
+  // Set new frame version
+  pEvent->head |= (version & VSCP_HEADER16_FRAME_VERSION_MASK);
+
+  return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////////
+// setFrameVersion
+//
+
+bool
+setFrameVersion(vscpEventEx *pEventEx, uint16_t version)
+{
+  if (nullptr == pEventEx) {
+    return false;
+  }
+
+  // Clear existing frame version bits
+  pEventEx->head &= ~VSCP_HEADER16_FRAME_VERSION_MASK;
+
+  // Set new frame version
+  pEventEx->head |= (version & VSCP_HEADER16_FRAME_VERSION_MASK);
+
+  return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////

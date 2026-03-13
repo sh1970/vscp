@@ -10,11 +10,11 @@ env:
   BUILD_TYPE: Debug
 
 jobs:
-  test:
+  test-linux:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         submodules: 'recursive'
      
@@ -46,6 +46,45 @@ jobs:
     - name: Build unit tests
       working-directory: ${{github.workspace}}/tests/build
       run: make -j$(nproc)
+
+    - name: Run unit tests
+      working-directory: ${{github.workspace}}/tests/build
+      run: |
+        echo "Running GUID tests..."
+        ./guid/unittest_guid
+        echo "Running DateTime tests..."
+        ./vscpdatetime/unittest_datetime
+        echo "Running VscpHelper tests..."
+        ./vscphelper/unittest_vscphelper
+
+  test-macos:
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+
+    - name: Install dependencies via Homebrew
+      run: |
+        brew update
+        brew install googletest openssl@3 expat
+
+    - name: Create test build directory
+      run: cmake -E make_directory ${{github.workspace}}/tests/build
+
+    - name: Configure unit tests
+      working-directory: ${{github.workspace}}/tests/build
+      run: |
+        OPENSSL_PREFIX=$(brew --prefix openssl@3)
+        EXPAT_PREFIX=$(brew --prefix expat)
+        cmake .. -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+          -DOPENSSL_ROOT_DIR=${OPENSSL_PREFIX} \
+          -DCMAKE_PREFIX_PATH="${OPENSSL_PREFIX};${EXPAT_PREFIX}"
+
+    - name: Build unit tests
+      working-directory: ${{github.workspace}}/tests/build
+      run: make -j$(sysctl -n hw.ncpu)
 
     - name: Run unit tests
       working-directory: ${{github.workspace}}/tests/build

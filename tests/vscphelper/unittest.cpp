@@ -28,6 +28,7 @@
 #include <cstring>
 #include <climits>
 #include <cmath>
+#include <cstdint>
 
 #include "vscphelper.h"
 #include "vscp.h"
@@ -3268,6 +3269,352 @@ TEST(VscpHelper, getEventFromFrame_UnixNsFormat_RoundTrip)
     
     delete[] eventOut.pdata;
     vscp_deleteEvent(&eventIn);
+}
+
+// =============================================================================
+//                      Platform Compatibility - Byteswap
+// =============================================================================
+
+TEST(PlatformCompat, bswap_16_basic)
+{
+    // Test basic 16-bit byte swap
+    EXPECT_EQ(0x3412, bswap_16(0x1234));
+    EXPECT_EQ(0x0000, bswap_16(0x0000));
+    EXPECT_EQ(0xFFFF, bswap_16(0xFFFF));
+    EXPECT_EQ(0x00FF, bswap_16(0xFF00));
+    EXPECT_EQ(0xFF00, bswap_16(0x00FF));
+}
+
+TEST(PlatformCompat, bswap_16_roundtrip)
+{
+    // Double swap should return original value
+    uint16_t original = 0xABCD;
+    EXPECT_EQ(original, bswap_16(bswap_16(original)));
+    
+    original = 0x1234;
+    EXPECT_EQ(original, bswap_16(bswap_16(original)));
+}
+
+TEST(PlatformCompat, bswap_32_basic)
+{
+    // Test basic 32-bit byte swap
+    EXPECT_EQ(0x78563412u, bswap_32(0x12345678u));
+    EXPECT_EQ(0x00000000u, bswap_32(0x00000000u));
+    EXPECT_EQ(0xFFFFFFFFu, bswap_32(0xFFFFFFFFu));
+    EXPECT_EQ(0x000000FFu, bswap_32(0xFF000000u));
+    EXPECT_EQ(0xFF000000u, bswap_32(0x000000FFu));
+}
+
+TEST(PlatformCompat, bswap_32_roundtrip)
+{
+    // Double swap should return original value
+    uint32_t original = 0xDEADBEEF;
+    EXPECT_EQ(original, bswap_32(bswap_32(original)));
+    
+    original = 0x12345678;
+    EXPECT_EQ(original, bswap_32(bswap_32(original)));
+}
+
+TEST(PlatformCompat, bswap_64_basic)
+{
+    // Test basic 64-bit byte swap
+    EXPECT_EQ(0xEFCDAB9078563412ULL, bswap_64(0x1234567890ABCDEFULL));
+    EXPECT_EQ(0x0000000000000000ULL, bswap_64(0x0000000000000000ULL));
+    EXPECT_EQ(0xFFFFFFFFFFFFFFFFULL, bswap_64(0xFFFFFFFFFFFFFFFFULL));
+    EXPECT_EQ(0x00000000000000FFULL, bswap_64(0xFF00000000000000ULL));
+    EXPECT_EQ(0xFF00000000000000ULL, bswap_64(0x00000000000000FFULL));
+}
+
+TEST(PlatformCompat, bswap_64_roundtrip)
+{
+    // Double swap should return original value
+    uint64_t original = 0xDEADBEEFCAFEBABEULL;
+    EXPECT_EQ(original, bswap_64(bswap_64(original)));
+    
+    original = 0x123456789ABCDEF0ULL;
+    EXPECT_EQ(original, bswap_64(bswap_64(original)));
+}
+
+TEST(PlatformCompat, bswap_network_order_conversion)
+{
+    // Test conversion to/from network byte order (big-endian)
+    // This ensures the byteswap works correctly for network protocol use
+    uint16_t host16 = 0x1234;
+    uint16_t net16 = bswap_16(host16);
+    
+    // bswap_16(0x1234) = 0x3412
+    EXPECT_EQ(0x3412, net16);
+    
+    // After swap, verify the individual bytes
+    uint8_t *bytes = (uint8_t *)&net16;
+    // On little-endian: 0x3412 is stored as [0x12, 0x34] in memory
+    // On big-endian: 0x3412 is stored as [0x34, 0x12] in memory
+    // The important thing is that double-swap returns original
+    EXPECT_EQ(host16, bswap_16(net16));
+}
+
+// =============================================================================
+//                      Event Creation and Deletion
+// =============================================================================
+
+TEST(EventManagement, vscp_newEvent_basic)
+{
+    vscpEvent *pEvent = nullptr;
+    
+    // Create new event with default frame version
+    EXPECT_TRUE(vscp_newEvent(&pEvent, 0));
+    ASSERT_NE(nullptr, pEvent);
+    EXPECT_EQ(0, pEvent->head);
+    EXPECT_EQ(0, pEvent->sizeData);
+    EXPECT_EQ(nullptr, pEvent->pdata);
+    
+    // Cleanup
+    vscp_deleteEvent_v2(&pEvent);
+    EXPECT_EQ(nullptr, pEvent);
+}
+
+TEST(EventManagement, vscp_newEvent_with_frame_version)
+{
+    vscpEvent *pEvent = nullptr;
+    
+    // Create new event with UNIX_NS frame version
+    EXPECT_TRUE(vscp_newEvent(&pEvent, VSCP_HEADER16_FRAME_VERSION_UNIX_NS));
+    ASSERT_NE(nullptr, pEvent);
+    EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_UNIX_NS, pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK);
+    EXPECT_EQ(0, pEvent->sizeData);
+    EXPECT_EQ(nullptr, pEvent->pdata);
+    
+    // Cleanup
+    vscp_deleteEvent_v2(&pEvent);
+    EXPECT_EQ(nullptr, pEvent);
+}
+
+TEST(EventManagement, vscp_newEventEx_basic)
+{
+    vscpEventEx *pEventEx = nullptr;
+    
+    // Create new eventEx with default frame version
+    EXPECT_TRUE(vscp_newEventEx(&pEventEx, 0));
+    ASSERT_NE(nullptr, pEventEx);
+    EXPECT_EQ(0, pEventEx->head);
+    EXPECT_EQ(0, pEventEx->sizeData);
+    
+    // Cleanup
+    vscp_deleteEventEx(&pEventEx);
+    EXPECT_EQ(nullptr, pEventEx);
+}
+
+TEST(EventManagement, vscp_newEventEx_with_frame_version)
+{
+    vscpEventEx *pEventEx = nullptr;
+    
+    // Create new eventEx with UNIX_NS frame version
+    EXPECT_TRUE(vscp_newEventEx(&pEventEx, VSCP_HEADER16_FRAME_VERSION_UNIX_NS));
+    ASSERT_NE(nullptr, pEventEx);
+    EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_UNIX_NS, pEventEx->head & VSCP_HEADER16_FRAME_VERSION_MASK);
+    EXPECT_EQ(0, pEventEx->sizeData);
+    
+    // Cleanup
+    vscp_deleteEventEx(&pEventEx);
+    EXPECT_EQ(nullptr, pEventEx);
+}
+
+TEST(EventManagement, vscp_deleteEvent_with_data)
+{
+    vscpEvent *pEvent = nullptr;
+    
+    // Create event and add data
+    EXPECT_TRUE(vscp_newEvent(&pEvent, 0));
+    ASSERT_NE(nullptr, pEvent);
+    
+    // Allocate and set data
+    pEvent->sizeData = 5;
+    pEvent->pdata = new uint8_t[5];
+    pEvent->pdata[0] = 0x11;
+    pEvent->pdata[1] = 0x22;
+    pEvent->pdata[2] = 0x33;
+    pEvent->pdata[3] = 0x44;
+    pEvent->pdata[4] = 0x55;
+    
+    // Delete should free data
+    vscp_deleteEvent(pEvent);
+    EXPECT_EQ(nullptr, pEvent->pdata);
+    
+    // Full cleanup
+    delete pEvent;
+}
+
+TEST(EventManagement, vscp_deleteEvent_v2_sets_nullptr)
+{
+    vscpEvent *pEvent = nullptr;
+    
+    // Create event
+    EXPECT_TRUE(vscp_newEvent(&pEvent, 0));
+    ASSERT_NE(nullptr, pEvent);
+    
+    // Delete should set pointer to nullptr
+    vscp_deleteEvent_v2(&pEvent);
+    EXPECT_EQ(nullptr, pEvent);
+}
+
+TEST(EventManagement, vscp_deleteEventEx_sets_nullptr)
+{
+    vscpEventEx *pEventEx = nullptr;
+    
+    // Create eventEx
+    EXPECT_TRUE(vscp_newEventEx(&pEventEx, 0));
+    ASSERT_NE(nullptr, pEventEx);
+    
+    // Delete should set pointer to nullptr
+    vscp_deleteEventEx(&pEventEx);
+    EXPECT_EQ(nullptr, pEventEx);
+}
+
+TEST(EventManagement, vscp_deleteEvent_null_safe)
+{
+    vscpEvent *pEvent = nullptr;
+    
+    // Should not crash when called with nullptr
+    vscp_deleteEvent(nullptr);
+    vscp_deleteEvent_v2(&pEvent);
+    EXPECT_EQ(nullptr, pEvent);
+}
+
+TEST(EventManagement, vscp_deleteEventEx_null_safe)
+{
+    vscpEventEx *pEventEx = nullptr;
+    
+    // Should not crash when called with nullptr
+    vscp_deleteEventEx(&pEventEx);
+    EXPECT_EQ(nullptr, pEventEx);
+}
+
+// =============================================================================
+//                      Frame Version Functions
+// =============================================================================
+
+TEST(FrameVersion, setFrameVersion_event_original)
+{
+    vscpEvent *pEvent = nullptr;
+    EXPECT_TRUE(vscp_newEvent(&pEvent, 0));
+    ASSERT_NE(nullptr, pEvent);
+    
+    // Set to original frame version (0)
+    EXPECT_TRUE(setFrameVersion(pEvent, VSCP_HEADER16_FRAME_VERSION_ORIGINAL));
+    EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_ORIGINAL, pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK);
+    
+    vscp_deleteEvent_v2(&pEvent);
+}
+
+TEST(FrameVersion, setFrameVersion_event_unix_ns)
+{
+    vscpEvent *pEvent = nullptr;
+    EXPECT_TRUE(vscp_newEvent(&pEvent, 0));
+    ASSERT_NE(nullptr, pEvent);
+    
+    // Set to UNIX_NS frame version
+    EXPECT_TRUE(setFrameVersion(pEvent, VSCP_HEADER16_FRAME_VERSION_UNIX_NS));
+    EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_UNIX_NS, pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK);
+    
+    vscp_deleteEvent_v2(&pEvent);
+}
+
+TEST(FrameVersion, setFrameVersion_event_preserves_other_bits)
+{
+    vscpEvent *pEvent = nullptr;
+    EXPECT_TRUE(vscp_newEvent(&pEvent, 0));
+    ASSERT_NE(nullptr, pEvent);
+    
+    // Set priority and other header bits
+    pEvent->head = 0xE0;  // Priority 7 (bits 5-7)
+    
+    // Change frame version - should preserve priority bits
+    EXPECT_TRUE(setFrameVersion(pEvent, VSCP_HEADER16_FRAME_VERSION_UNIX_NS));
+    
+    // Priority should still be 7
+    EXPECT_EQ(7, (pEvent->head >> 5) & 0x07);
+    // Frame version should be UNIX_NS
+    EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_UNIX_NS, pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK);
+    
+    vscp_deleteEvent_v2(&pEvent);
+}
+
+TEST(FrameVersion, setFrameVersion_eventEx_original)
+{
+    vscpEventEx *pEventEx = nullptr;
+    EXPECT_TRUE(vscp_newEventEx(&pEventEx, 0));
+    ASSERT_NE(nullptr, pEventEx);
+    
+    // Set to original frame version (0)
+    EXPECT_TRUE(setFrameVersion(pEventEx, VSCP_HEADER16_FRAME_VERSION_ORIGINAL));
+    EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_ORIGINAL, pEventEx->head & VSCP_HEADER16_FRAME_VERSION_MASK);
+    
+    vscp_deleteEventEx(&pEventEx);
+}
+
+TEST(FrameVersion, setFrameVersion_eventEx_unix_ns)
+{
+    vscpEventEx *pEventEx = nullptr;
+    EXPECT_TRUE(vscp_newEventEx(&pEventEx, 0));
+    ASSERT_NE(nullptr, pEventEx);
+    
+    // Set to UNIX_NS frame version
+    EXPECT_TRUE(setFrameVersion(pEventEx, VSCP_HEADER16_FRAME_VERSION_UNIX_NS));
+    EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_UNIX_NS, pEventEx->head & VSCP_HEADER16_FRAME_VERSION_MASK);
+    
+    vscp_deleteEventEx(&pEventEx);
+}
+
+TEST(FrameVersion, setFrameVersion_eventEx_preserves_other_bits)
+{
+    vscpEventEx *pEventEx = nullptr;
+    EXPECT_TRUE(vscp_newEventEx(&pEventEx, 0));
+    ASSERT_NE(nullptr, pEventEx);
+    
+    // Set priority and other header bits
+    pEventEx->head = 0xE0;  // Priority 7 (bits 5-7)
+    
+    // Change frame version - should preserve priority bits
+    EXPECT_TRUE(setFrameVersion(pEventEx, VSCP_HEADER16_FRAME_VERSION_UNIX_NS));
+    
+    // Priority should still be 7
+    EXPECT_EQ(7, (pEventEx->head >> 5) & 0x07);
+    // Frame version should be UNIX_NS
+    EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_UNIX_NS, pEventEx->head & VSCP_HEADER16_FRAME_VERSION_MASK);
+    
+    vscp_deleteEventEx(&pEventEx);
+}
+
+TEST(FrameVersion, setFrameVersion_null_event)
+{
+    vscpEvent *pEvent = nullptr;
+    EXPECT_FALSE(setFrameVersion(pEvent, VSCP_HEADER16_FRAME_VERSION_UNIX_NS));
+}
+
+TEST(FrameVersion, setFrameVersion_null_eventEx)
+{
+    vscpEventEx *pEventEx = nullptr;
+    EXPECT_FALSE(setFrameVersion(pEventEx, VSCP_HEADER16_FRAME_VERSION_UNIX_NS));
+}
+
+TEST(FrameVersion, setFrameVersion_switch_versions)
+{
+    vscpEvent *pEvent = nullptr;
+    EXPECT_TRUE(vscp_newEvent(&pEvent, VSCP_HEADER16_FRAME_VERSION_ORIGINAL));
+    ASSERT_NE(nullptr, pEvent);
+    
+    // Start with original
+    EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_ORIGINAL, pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK);
+    
+    // Switch to UNIX_NS
+    EXPECT_TRUE(setFrameVersion(pEvent, VSCP_HEADER16_FRAME_VERSION_UNIX_NS));
+    EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_UNIX_NS, pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK);
+    
+    // Switch back to original
+    EXPECT_TRUE(setFrameVersion(pEvent, VSCP_HEADER16_FRAME_VERSION_ORIGINAL));
+    EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_ORIGINAL, pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK);
+    
+    vscp_deleteEvent_v2(&pEvent);
 }
 
 // Entry point for Google Test
