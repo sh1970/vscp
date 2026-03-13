@@ -81,7 +81,9 @@ jobs:
         GTEST_PREFIX=$(brew --prefix googletest)
         cmake .. -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
           -DOPENSSL_ROOT_DIR=${OPENSSL_PREFIX} \
-          -DCMAKE_PREFIX_PATH="${OPENSSL_PREFIX};${EXPAT_PREFIX};${GTEST_PREFIX}"
+          -DCMAKE_PREFIX_PATH="${OPENSSL_PREFIX};${EXPAT_PREFIX};${GTEST_PREFIX}" \
+          -DCMAKE_CXX_FLAGS="-I${GTEST_PREFIX}/include" \
+          -DCMAKE_LIBRARY_PATH="${GTEST_PREFIX}/lib"
 
     - name: Build unit tests
       working-directory: ${{github.workspace}}/tests/build
