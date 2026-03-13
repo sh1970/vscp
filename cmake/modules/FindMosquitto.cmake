@@ -9,10 +9,13 @@
 if (NOT MOSQUITTO_INCLUDE_DIR)
   find_path(MOSQUITTO_INCLUDE_DIR mosquitto.h
     HINTS
+      # macOS / Homebrew
       /opt/homebrew/include
       /usr/local/include
       /opt/homebrew/opt/mosquitto/include
       /usr/local/opt/mosquitto/include
+      # Windows / vcpkg (CMAKE_PREFIX_PATH is set by vcpkg toolchain)
+      ${CMAKE_PREFIX_PATH}/include
   )
 endif()
 
@@ -21,10 +24,13 @@ if (NOT MOSQUITTO_LIBRARY)
     MOSQUITTO_LIBRARY
     NAMES mosquitto
     HINTS
+      # macOS / Homebrew
       /opt/homebrew/lib
       /usr/local/lib
       /opt/homebrew/opt/mosquitto/lib
       /usr/local/opt/mosquitto/lib
+      # Windows / vcpkg
+      ${CMAKE_PREFIX_PATH}/lib
   )
 endif()
 

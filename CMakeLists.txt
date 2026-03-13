@@ -205,7 +205,7 @@ if (WIN32)
     #find_package(unofficial-sqlite3 CONFIG REQUIRED)
 
     # Mosquitto lib
-    find_package(mosquitto CONFIG REQUIRED)
+    include(FindMosquitto)
 
     # Expat C library
     find_package(expat CONFIG REQUIRED)
