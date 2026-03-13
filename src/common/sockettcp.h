@@ -167,8 +167,9 @@ union usa
 
 /* 
     Describes a string (chunk of memory).
+    Named stcp_msg to avoid conflict with macOS sys/msg.h
 */
-struct msg
+struct stcp_msg
 {
     const char *ptr;
     size_t len;

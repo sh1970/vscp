@@ -25,10 +25,16 @@ jobs:
 
     - name: Configure CMake
       run: |
+        MOSQUITTO_PREFIX=$(brew --prefix mosquitto)
+        OPENSSL_PREFIX=$(brew --prefix openssl@3)
+        EXPAT_PREFIX=$(brew --prefix expat)
         cmake -B ${{github.workspace}}/build \
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
-          -DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3) \
-          -DCMAKE_PREFIX_PATH="$(brew --prefix mosquitto);$(brew --prefix expat)"
+          -DOPENSSL_ROOT_DIR=${OPENSSL_PREFIX} \
+          -DMOSQUITTO_INCLUDE_DIR=${MOSQUITTO_PREFIX}/include \
+          -DMOSQUITTO_LIBRARY=${MOSQUITTO_PREFIX}/lib/libmosquitto.dylib \
+          -DEXPAT_INCLUDE_DIR=${EXPAT_PREFIX}/include \
+          -DEXPAT_LIBRARY=${EXPAT_PREFIX}/lib/libexpat.dylib
 
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} -j$(sysctl -n hw.ncpu)

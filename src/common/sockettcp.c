@@ -3431,7 +3431,7 @@ stcp_close_all_listening_sockets(struct server_context *srv_ctx)
 //
 
 static const char *
-next_option(const char *list, struct msg *val, struct msg *eq_val)
+next_option(const char *list, struct stcp_msg *val, struct stcp_msg *eq_val)
 {
   int end;
 
@@ -3509,7 +3509,7 @@ reparse:
 // Returns: 0 = failure. 1 == success
 
 static int
-parse_port_string(const struct msg *msg, struct socket *so, int *ip_version)
+parse_port_string(const struct stcp_msg *msg, struct socket *so, int *ip_version)
 {
   unsigned int a, b, c, d, port;
   int ch, len;
@@ -3631,7 +3631,7 @@ stcp_listening(struct server_context *srv_ctx, const char *str_listening_port)
   const char *list;
   int on  = 1;
   int off = 0;
-  struct msg msg;
+  struct stcp_msg msg;
   struct socket so, *ptr;
 
   struct pollfd *pfd;
