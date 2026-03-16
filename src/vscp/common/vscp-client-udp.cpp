@@ -758,10 +758,10 @@ vscpClientUdp::getversion(uint8_t *pmajor, uint8_t *pminor, uint8_t *prelease, u
     return VSCP_ERROR_INVALID_POINTER;
   }
 
-  *pmajor   = VSCP_MAJOR_MULTICAST_CLIENT_VERSION;
-  *pminor   = VSCP_MINOR_MULTICAST_CLIENT_VERSION;
-  *prelease = VSCP_RELEASE_MULTICAST_CLIENT_VERSION;
-  *pbuild   = VSCP_BUILD_MULTICAST_CLIENT_VERSION;
+  *pmajor   = VSCP_MAJOR_UDP_CLIENT_VERSION;
+  *pminor   = VSCP_MINOR_UDP_CLIENT_VERSION;
+  *prelease = VSCP_RELEASE_UDP_CLIENT_VERSION;
+  *pbuild   = VSCP_BUILD_UDP_CLIENT_VERSION;
 
   return VSCP_ERROR_SUCCESS;
 }

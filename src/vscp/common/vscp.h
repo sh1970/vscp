@@ -370,54 +370,51 @@ typedef VSCPChannelInfo *PVSCPCHANNELINFO;
   type is coded in the four least significant bits.
 */
 
-/* * * * Multicast on VSCP reserved IP 224.0.23.158 */
-
+/* * * * Multicast on VSCP reserved IP */
 #define VSCP_MULTICAST_IPV4_ADDRESS_STR "224.0.23.158"
 
 /* Packet frame format type = 0                         */
 /*      without byte0 and CRC                           */
 /*      total frame size is 1 + 34 + 2 + data-length    */
-#define VSCP_MULTICAST_PACKET0_HEADER_LENGTH 35
+//#define VSCP_MULTICAST_PACKET0_HEADER_LENGTH 35
 
 /* Multicast packet ordinals */
-#define VSCP_MULTICAST_PACKET0_POS_PKTTYPE        0
-#define VSCP_MULTICAST_PACKET0_POS_HEAD           1
-#define VSCP_MULTICAST_PACKET0_POS_HEAD_MSB       1
-#define VSCP_MULTICAST_PACKET0_POS_HEAD_LSB       2
-#define VSCP_MULTICAST_PACKET0_POS_TIMESTAMP      3
-#define VSCP_MULTICAST_PACKET0_POS_YEAR           7
-#define VSCP_MULTICAST_PACKET0_POS_YEAR_MSB       7
-#define VSCP_MULTICAST_PACKET0_POS_YEAR_LSB       8
-#define VSCP_MULTICAST_PACKET0_POS_MONTH          9
-#define VSCP_MULTICAST_PACKET0_POS_DAY            10
-#define VSCP_MULTICAST_PACKET0_POS_HOUR           11
-#define VSCP_MULTICAST_PACKET0_POS_MINUTE         12
-#define VSCP_MULTICAST_PACKET0_POS_SECOND         13
-#define VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS     14
-#define VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_MSB 14
-#define VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_LSB 15
-#define VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE      16
-#define VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_MSB  16
-#define VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_LSB  17
-#define VSCP_MULTICAST_PACKET0_POS_VSCP_GUID      18
-#define VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE      34
-#define VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_MSB  34
-#define VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_LSB  35
-#define VSCP_MULTICAST_PACKET0_POS_VSCP_DATA      36
+// #define VSCP_MULTICAST_PACKET0_POS_PKTTYPE        0
+// #define VSCP_MULTICAST_PACKET0_POS_HEAD           1
+// #define VSCP_MULTICAST_PACKET0_POS_HEAD_MSB       1
+// #define VSCP_MULTICAST_PACKET0_POS_HEAD_LSB       2
+// #define VSCP_MULTICAST_PACKET0_POS_TIMESTAMP      3
+// #define VSCP_MULTICAST_PACKET0_POS_YEAR           7
+// #define VSCP_MULTICAST_PACKET0_POS_YEAR_MSB       7
+// #define VSCP_MULTICAST_PACKET0_POS_YEAR_LSB       8
+// #define VSCP_MULTICAST_PACKET0_POS_MONTH          9
+// #define VSCP_MULTICAST_PACKET0_POS_DAY            10
+// #define VSCP_MULTICAST_PACKET0_POS_HOUR           11
+// #define VSCP_MULTICAST_PACKET0_POS_MINUTE         12
+// #define VSCP_MULTICAST_PACKET0_POS_SECOND         13
+// #define VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS     14
+// #define VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_MSB 14
+// #define VSCP_MULTICAST_PACKET0_POS_VSCP_CLASS_LSB 15
+// #define VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE      16
+// #define VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_MSB  16
+// #define VSCP_MULTICAST_PACKET0_POS_VSCP_TYPE_LSB  17
+// #define VSCP_MULTICAST_PACKET0_POS_VSCP_GUID      18
+// #define VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE      34
+// #define VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_MSB  34
+// #define VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_LSB  35
+// #define VSCP_MULTICAST_PACKET0_POS_VSCP_DATA      36
 /* Two byte CRC follow here and if the frame is encrypted */
-/* the initialization vector follows. */
+/* the initialization vector (16 bytes) follows the CRC. */
 
 // Maximum packet size (for buffer allocation)
-#define VSCP_MULTICAST_PACKET0_MAX (1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH + 2 + VSCP_LEVEL2_MAXDATA + 16)
+//#define VSCP_MULTICAST_PACKET0_MAX (1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH + 2 + VSCP_LEVEL2_MAXDATA + 16)
 
 /* VSCP multicast packet types */
 #define VSCP_MULTICAST_TYPE_EVENT0 0
 #define VSCP_MULTICAST_TYPE_EVENT1 1
 #define VSCP_MULTICAST_TYPE_EVENT  0 /* Legacy alias */
 
-#define SET_VSCP_MULTICAST_TYPE(type, encryption)  ((type << 4) | encryption)
-#define GET_VSCP_MULTICAST_PACKET_TYPE(type)       ((type >> 4) & 0x0f)
-#define GET_VSCP_MULTICAST_PACKET_ENCRYPTION(type) ((type) & 0x0f)
+
 
 /* Multicast proxy CLASS=1026, TYPE=3  */
 /* https://www.vscp.org/docs/vscpspec/doku.php?id=class2.information#type_3_0x0003_level_ii_proxy_node_heartbeat
@@ -433,6 +430,11 @@ typedef VSCPChannelInfo *PVSCPCHANNELINFO;
   VSCP general binary packet
   --------------------------
 
+  * **Packet types** are defined in the first bytes high nibble of each frame.
+  * **Frame types** are defined in the header field of the frame. The frame type is identified
+    by the frame version bits in the head field. The frame version bits are bits 8 and 9 of
+    the head field. For frame type 0 these bits are 00 and for frame type 1 these bits are 01.
+
   There are two frame types
 
   0 - Original frame format with 32-bit timestamp in milliseconds plus the year, month, day, hour,
@@ -444,50 +446,79 @@ typedef VSCPChannelInfo *PVSCPCHANNELINFO;
   type 1 these bits are 01.
 */
 
+// Helper macros
+#define SET_VSCP_BINARY_TYPE(type, encryption)  ((type << 4) | encryption)
+#define GET_VSCP_BINARY_PACKET_TYPE(type)       ((type >> 4) & 0x0f)
+#define GET_VSCP_BINARY_PACKET_ENCRYPTION(type) ((type) & 0x0f)
+
+// Packet types in the first bytes high nibble of the head field for binary packets
+#define VSCP_BINARY_PKTTYPE_EVENT    0x00 // Events
+#define VSCP_BINARY_PKTTYPE_COMMAND  0xe0 // Commands
+#define VSCP_BINARY_PKTTYPE_RESPONSE 0xf0 // Replies to commands
+
 /* Packet frame format type = 1 (UNIX_NS nanosecond timestamp)  */
 /*      without byte0 and CRC                                   */
 /*      total frame size is 1 + 35 + 2 + data-length            */
-#define VSCP_BINARY_PACKET0_HEADER_LENGTH 35
+#define VSCP_BINARY_PACKET_FRAME0_HEADER_LENGTH 35
 
-/* Binary packet1 ordinals */
-#define VSCP_BINARY_PACKET0_POS_PKTTYPE  0
-#define VSCP_BINARY_PACKET0_POS_HEAD     1
-#define VSCP_BINARY_PACKET0_POS_HEAD_MSB 1
-#define VSCP_BINARY_PACKET0_POS_HEAD_LSB 2
+/* Binary packet frame 0/1 ordinals */
+#define VSCP_BINARY_PACKET_FRAME0_POS_PKTTYPE  0
+#define VSCP_BINARY_PACKET_FRAME0_POS_HEAD     1
+#define VSCP_BINARY_PACKET_FRAME0_POS_HEAD_MSB 1
+#define VSCP_BINARY_PACKET_FRAME0_POS_HEAD_LSB 2
 
-// Frame type = 0
-#define VSCP_BINARY_PACKET0_POS_TIMESTAMP 3
-#define VSCP_BINARY_PACKET0_POS_YEAR      7
-#define VSCP_BINARY_PACKET0_POS_YEAR_MSB  7
-#define VSCP_BINARY_PACKET0_POS_YEAR_LSB  8
-#define VSCP_BINARY_PACKET0_POS_MONTH     9
-#define VSCP_BINARY_PACKET0_POS_DAY       10
-#define VSCP_BINARY_PACKET0_POS_HOUR      11
-#define VSCP_BINARY_PACKET0_POS_MINUTE    12
-#define VSCP_BINARY_PACKET0_POS_SECOND    13
+// Frame type = 0 specific ordinals
+#define VSCP_BINARY_PACKET_FRAME0_POS_TIMESTAMP 3
+#define VSCP_BINARY_PACKET_FRAME0_POS_YEAR      7
+#define VSCP_BINARY_PACKET_FRAME0_POS_YEAR_MSB  7
+#define VSCP_BINARY_PACKET_FRAME0_POS_YEAR_LSB  8
+#define VSCP_BINARY_PACKET_FRAME0_POS_MONTH     9
+#define VSCP_BINARY_PACKET_FRAME0_POS_DAY       10
+#define VSCP_BINARY_PACKET_FRAME0_POS_HOUR      11
+#define VSCP_BINARY_PACKET_FRAME0_POS_MINUTE    12
+#define VSCP_BINARY_PACKET_FRAME0_POS_SECOND    13
 
-// Frame type = 1
-#define VSCP_BINARY_PACKET0_POS_TIMESTAMP 3  /* 64-bit nanosecond timestamp */
-#define VSCP_BINARY_PACKET0_POS_RESERVED1 11 /* Reserved byte 1 */
-#define VSCP_BINARY_PACKET0_POS_RESERVED2 12 /* Reserved byte 2 */
-#define VSCP_BINARY_PACKET0_POS_RESERVED3 13 /* Reserved byte 3 */
+// Frame type = 1 specific ordinals
+#define VSCP_BINARY_PACKET_FRAME1_POS_TIMESTAMP 3  /* 64-bit nanosecond timestamp */
+#define VSCP_BINARY_PACKET_FRAME1_POS_RESERVED1 11 /* Reserved byte 1 */
+#define VSCP_BINARY_PACKET_FRAME1_POS_RESERVED2 12 /* Reserved byte 2 */
+#define VSCP_BINARY_PACKET_FRAME1_POS_RESERVED3 13 /* Reserved byte 3 */
 
-#define VSCP_BINARY_PACKET0_POS_VSCP_CLASS     14
-#define VSCP_BINARY_PACKET0_POS_VSCP_CLASS_MSB 14
-#define VSCP_BINARY_PACKET0_POS_VSCP_CLASS_LSB 15
-#define VSCP_BINARY_PACKET0_POS_VSCP_TYPE      16
-#define VSCP_BINARY_PACKET0_POS_VSCP_TYPE_MSB  16
-#define VSCP_BINARY_PACKET0_POS_VSCP_TYPE_LSB  17
-#define VSCP_BINARY_PACKET0_POS_VSCP_GUID      18
-#define VSCP_BINARY_PACKET0_POS_VSCP_SIZE      34
-#define VSCP_BINARY_PACKET0_POS_VSCP_SIZE_MSB  34
-#define VSCP_BINARY_PACKET0_POS_VSCP_SIZE_LSB  35
-#define VSCP_BINARY_PACKET0_POS_VSCP_DATA      36
+// Common ordinals for frame type 0 and 1
+#define VSCP_BINARY_PACKET_FRAME0_POS_CLASS     14
+#define VSCP_BINARY_PACKET_FRAME0_POS_CLASS_MSB 14
+#define VSCP_BINARY_PACKET_FRAME0_POS_CLASS_LSB 15
+#define VSCP_BINARY_PACKET_FRAME0_POS_TYPE      16
+#define VSCP_BINARY_PACKET_FRAME0_POS_TYPE_MSB  16
+#define VSCP_BINARY_PACKET_FRAME0_POS_TYPE_LSB  17
+#define VSCP_BINARY_PACKET_FRAME0_POS_GUID      18
+#define VSCP_BINARY_PACKET_FRAME0_POS_SIZE      34
+#define VSCP_BINARY_PACKET_FRAME0_POS_SIZE_MSB  34
+#define VSCP_BINARY_PACKET_FRAME0_POS_SIZE_LSB  35
+#define VSCP_BINARY_PACKET_FRAME0_POS_DATA      36
 /* Two byte CRC follow here and if the frame is encrypted */
-/* the initialization vector follows. */
+/* the initialization vector (16 bytes) follows the CRC. */
 
 // Maximum packet1 size (for buffer allocation)
 #define VSCP_BINARY_PACKET0_MAX (1 + VSCP_BINARY_PACKET1_HEADER_LENGTH + 2 + VSCP_LEVEL2_MAXDATA + 16)
+
+// Command packet ordinals
+#define VSCP_BINARY_COMMAND_PACKET_POS_PKTTYPE 0 /* Packet type is in the first byte of the head field */
+#define VSCP_BINARY_COMMAND_PACKET_POS_COMMAND_MSB 1 /* Command code MSB */
+#define VSCP_BINARY_COMMAND_PACKET_POS_COMMAND_LSB 2 /* Command code LSB */
+#define VSCP_BINARY_COMMAND_PACKET_POS_ARG 3 /* Command argument starts here */
+/* Two byte CRC follow here and if the frame is encrypted */
+/* the initialization vector (16 bytes) follows the CRC. */
+
+// Response packet ordinals
+#define VSCP_BINARY_RESPONSE_PACKET_POS_PKTTYPE 0 /* Packet type is in the first byte of the head field */
+#define VSCP_BINARY_RESPONSE_PACKET_POS_COMMAND_MSB 1 /* Command code MSB */
+#define VSCP_BINARY_RESPONSE_PACKET_POS_COMMAND_LSB 2 /* Command code LSB */
+#define VSCP_BINARY_RESPONSE_PACKET_POS_ERROR_MSB 3 /* Error code MSB */
+#define VSCP_BINARY_RESPONSE_PACKET_POS_ERROR_LSB 4 /* Error code LSB */
+#define VSCP_BINARY_RESPONSE_PACKET_POS_ARG 5 /* Command argument starts here */
+/* Two byte CRC follow here and if the frame is encrypted */
+/* the initialization vector (16 bytes) follows the CRC. */
 
 /*
   Default encryption keys for VSCP Server - !!!! should only be used on test systems !!!!

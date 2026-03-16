@@ -38,10 +38,10 @@ public:
   vscpClientUdp();
   virtual ~vscpClientUdp();
 
-  static const uint8_t VSCP_MAJOR_MULTICAST_CLIENT_VERSION   = 1;
-  static const uint8_t VSCP_MINOR_MULTICAST_CLIENT_VERSION   = 0;
-  static const uint8_t VSCP_RELEASE_MULTICAST_CLIENT_VERSION = 0;
-  static const uint8_t VSCP_BUILD_MULTICAST_CLIENT_VERSION   = 0;
+  static const uint8_t VSCP_MAJOR_UDP_CLIENT_VERSION   = 1;
+  static const uint8_t VSCP_MINOR_UDP_CLIENT_VERSION   = 0;
+  static const uint8_t VSCP_RELEASE_UDP_CLIENT_VERSION = 0;
+  static const uint8_t VSCP_BUILD_UDP_CLIENT_VERSION   = 0;
 
   /*!
       Connect to remote host

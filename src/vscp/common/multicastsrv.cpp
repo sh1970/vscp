@@ -113,7 +113,7 @@ channel] Host [%s] not allowed to send UDP datagrams.\n"), (const char
 
                 // Must be at least a packet-type + header and a crc
                 if ( nc->recv_mbuf.len < ( 1 +
-VSCP_MULTICAST_PACKET0_HEADER_LENGTH + 2 ) ) {
+VSCP_BINARY_PACKET_FRAME0_HEADER_LENGTH + 2 ) ) {
 
                     // Packet to short
                     syslog( LOG_ERR, vscp_str_format(("[Multicast channel] Frame
@@ -123,8 +123,8 @@ have invalid length = %d\n"), (int)nc->recv_mbuf.len ) ); return;
 
                 // If un-secure frames are not supported frames must be
 encrypted if ( !pMulticastClientThread->m_pChannel->m_bAllowUnsecure &&
-                        !GET_VSCP_MULTICAST_PACKET_ENCRYPTION(
-nc->recv_mbuf.buf[ VSCP_MULTICAST_PACKET0_POS_PKTTYPE ] ) ) { syslog( LOG_ERR,
+                        !GET_VSCP_BINARY_PACKET_ENCRYPTION(
+nc->recv_mbuf.buf[ VSCP_BINARY_PACKET_FRAME0_POS_PKTTYPE ] ) ) { syslog( LOG_ERR,
 vscp_str_format(("[Multicast channel] Frame must be encrypted (or
 m_bAllowUnsecure set to true) to be accepted.\n" ) ) ); return;
                 }
@@ -143,8 +143,8 @@ Received Multicast event\n" ) ), DAEMON_LOGMSG_DEBUG, DAEMON_LOGTYPE_GENERAL );
                     if ( pMulticastClientThread->m_pChannel->m_bSendAck ) {
                         replyAckFrame( pMulticastClientThread,
                                         nc->recv_mbuf.buf[
-VSCP_MULTICAST_PACKET0_POS_PKTTYPE ], ( nc->recv_mbuf.buf[
-VSCP_MULTICAST_PACKET0_POS_HEAD_LSB ] & 0xf8 ) );
+VSCP_BINARY_PACKET_FRAME0_POS_PKTTYPE ], ( nc->recv_mbuf.buf[
+VSCP_BINARY_PACKET_FRAME0_POS_HEAD_LSB ] & 0xf8 ) );
                     }
 
                 }
@@ -153,8 +153,8 @@ VSCP_MULTICAST_PACKET0_POS_HEAD_LSB ] & 0xf8 ) );
                     if ( pMulticastClientThread->m_pChannel->m_bSendAck ) {
                         replyNackFrame( pMulticastClientThread,
                                         nc->recv_mbuf.buf[
-VSCP_MULTICAST_PACKET0_POS_PKTTYPE ], ( nc->recv_mbuf.buf[
-VSCP_MULTICAST_PACKET0_POS_HEAD_LSB ] & 0xf8 ) );
+VSCP_BINARY_PACKET_FRAME0_POS_PKTTYPE ], ( nc->recv_mbuf.buf[
+VSCP_BINARY_PACKET_FRAME0_POS_HEAD_LSB ] & 0xf8 ) );
                     }
 
                 }
@@ -176,7 +176,7 @@ bool
 MulticastObj::sendFrame(struct mg_mgr *pmgr, CClientItem *pClientItem)
 { /*
      CLIENTEVENTLIST::compatibility_iterator nodeClient;
-     unsigned char sendbuf[1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH + 2 +
+     unsigned char sendbuf[1 + VSCP_BINARY_PACKET_FRAME0_HEADER_LENGTH + 2 +
                              VSCP_LEVEL2_MAXDATA + 16];    // Send buffer
      uint8_t iv[16];
 
@@ -203,7 +203,7 @@ MulticastObj::sendFrame(struct mg_mgr *pmgr, CClientItem *pClientItem)
      if ( vscp_doLevel2Filter( pEvent, &m_pChannel->m_txFilter ) ) {
 
          // Packet type
-         sendbuf[ VSCP_MULTICAST_PACKET0_POS_PKTTYPE ] =
+         sendbuf[ VSCP_BINARY_PACKET_FRAME0_POS_PKTTYPE ] =
                      SET_VSCP_MULTICAST_TYPE( 0, m_pChannel->m_nEncryption );
 
          // Get initialization vector
@@ -224,7 +224,7 @@ MulticastObj::sendFrame(struct mg_mgr *pmgr, CClientItem *pClientItem)
              return false;
          }
 
-         size_t len = 1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH +
+         size_t len = 1 + VSCP_BINARY_PACKET_FRAME0_HEADER_LENGTH +
  pEvent->sizeData + 2; if ( 0 == ( len = vscp_encryptVscpUdpFrame( sendbuf,
                                                  wrkbuf,
                                                  len,
@@ -352,7 +352,7 @@ MulticastObj::replyAckFrame(MulticastObj *pMulticastClientThread,
                             uint8_t pkttype,
                             uint8_t index)
 { /*
-     unsigned char sendbuf[1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH + 2 +
+     unsigned char sendbuf[1 + VSCP_BINARY_PACKET_FRAME0_HEADER_LENGTH + 2 +
                              VSCP_LEVEL2_MAXDATA + 16];    // Send buffer
 
      // Check pointer
@@ -383,8 +383,8 @@ MulticastObj::replyAckFrame(MulticastObj *pMulticastClientThread,
      }
 
      // Send to remote node
-     //mg_send( nc, sendbuf, 1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH + 2 +
-     ex.sizeData ); size_t len = 1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH + 2 +
+     //mg_send( nc, sendbuf, 1 + VSCP_BINARY_PACKET_FRAME0_HEADER_LENGTH + 2 +
+     ex.sizeData ); size_t len = 1 + VSCP_BINARY_PACKET_FRAME0_HEADER_LENGTH + 2 +
      ex.sizeData; if ( ( sendto( pMulticastClientThread->m_sendSock, sendbuf,
      len, 0, (struct sockaddr *) &pMulticastClientThread->m_mc_sendAddr, sizeof(
      pMulticastClientThread->m_mc_sendAddr ) ) ) != len ) {
@@ -405,7 +405,7 @@ MulticastObj::replyNackFrame(MulticastObj *pMulticastClientThread,
                              uint8_t pkttype,
                              uint8_t index)
 {
-    unsigned char sendbuf[1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH + 2 +
+    unsigned char sendbuf[1 + VSCP_BINARY_PACKET_FRAME0_HEADER_LENGTH + 2 +
                           VSCP_LEVEL2_MAXDATA + 16]; // Send buffer
 
     // Check pointer
@@ -436,8 +436,8 @@ MulticastObj::replyNackFrame(MulticastObj *pMulticastClientThread,
        }
 
        // Send to remote node
-       //mg_send( nc, sendbuf, 1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH + 2 +
-       ex.sizeData ); size_t len = 1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH + 2
+       //mg_send( nc, sendbuf, 1 + VSCP_BINARY_PACKET_FRAME0_HEADER_LENGTH + 2 +
+       ex.sizeData ); size_t len = 1 + VSCP_BINARY_PACKET_FRAME0_HEADER_LENGTH + 2
        + ex.sizeData; if ( ( sendto( pMulticastClientThread->m_sendSock,
        sendbuf, len, 0, (struct sockaddr *)
        &pMulticastClientThread->m_mc_sendAddr, sizeof(

@@ -153,7 +153,7 @@ int
 udpRemoteClient::sendFrame(void)
 {
     // We specify a send buffer that holds the maximum possible size
-    unsigned char sendbuf[VSCP_MULTICAST_PACKET0_MAX];  // Send buffer
+    unsigned char sendbuf[VSCP_BINARY_PACKET_FRAME0_MAX];  // Send buffer
     uint8_t iv[16];                                     // Initialization vector
 
     // Check if there is an event to send
@@ -190,13 +190,13 @@ udpRemoteClient::sendFrame(void)
     //    }
 
     // Packet type
-    sendbuf[VSCP_MULTICAST_PACKET0_POS_PKTTYPE] =
+    sendbuf[VSCP_BINARY_PACKET_FRAME0_POS_PKTTYPE] =
       SET_VSCP_MULTICAST_TYPE(0, m_nEncryption);
 
     // Get initialization vector
     getRandomIV(iv, 16);
 
-    uint8_t wrkbuf[VSCP_MULTICAST_PACKET0_MAX];
+    uint8_t wrkbuf[VSCP_BINARY_PACKET_FRAME0_MAX];
     memset(wrkbuf, 0, sizeof(wrkbuf));
 
     if (!vscp_writeEventToFrame(wrkbuf,
@@ -208,12 +208,12 @@ udpRemoteClient::sendFrame(void)
     }
 
     // Write rolling index
-    wrkbuf[VSCP_MULTICAST_PACKET0_POS_HEAD_LSB] &= 0xf8;
-    wrkbuf[VSCP_MULTICAST_PACKET0_POS_HEAD_LSB] |= (0x07 & m_index);
+    wrkbuf[VSCP_BINARY_PACKET_FRAME0_POS_HEAD_LSB] &= 0xf8;
+    wrkbuf[VSCP_BINARY_PACKET_FRAME0_POS_HEAD_LSB] |= (0x07 & m_index);
     m_index++;
 
     size_t lenSend =
-      1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH + pEvent->sizeData + 2;
+      1 + VSCP_BINARY_PACKET_FRAME0_HEADER_LENGTH + pEvent->sizeData + 2;
     if (0 == (lenSend = vscp_encryptFrame(sendbuf,
                                           wrkbuf,
                                           lenSend,
@@ -288,7 +288,7 @@ udpSrvObj::~udpSrvObj()
 int
 udpSrvObj::receiveFrame(int sockfd, CClientItem* pClientItem)
 {
-    uint8_t rcvbuf[VSCP_MULTICAST_PACKET0_MAX];
+    uint8_t rcvbuf[VSCP_BINARY_PACKET_FRAME0_MAX];
     vscpEvent* pEvent;
     int flags = MSG_DONTWAIT;
     struct sockaddr from;
@@ -312,8 +312,8 @@ udpSrvObj::receiveFrame(int sockfd, CClientItem* pClientItem)
         if (m_bAck) {
             replyNackFrame(
               &from,
-              rcvbuf[VSCP_MULTICAST_PACKET0_POS_PKTTYPE],
-              (rcvbuf[VSCP_MULTICAST_PACKET0_POS_HEAD_LSB] & 0xf8));
+              rcvbuf[VSCP_BINARY_PACKET_FRAME0_POS_PKTTYPE],
+              (rcvbuf[VSCP_BINARY_PACKET_FRAME0_POS_HEAD_LSB] & 0xf8));
         }
         return VSCP_ERROR_ERROR;
     }
@@ -327,15 +327,15 @@ udpSrvObj::receiveFrame(int sockfd, CClientItem* pClientItem)
         if (m_bAck) {
             replyNackFrame(
               &from,
-              rcvbuf[VSCP_MULTICAST_PACKET0_POS_PKTTYPE],
-              (rcvbuf[VSCP_MULTICAST_PACKET0_POS_HEAD_LSB] & 0xf8));
+              rcvbuf[VSCP_BINARY_PACKET_FRAME0_POS_PKTTYPE],
+              (rcvbuf[VSCP_BINARY_PACKET_FRAME0_POS_HEAD_LSB] & 0xf8));
         }
         return VSCP_ERROR_ERROR;
     }
 
     // Incoming data
     // Must be at least a packet-type + header and a crc
-    if (rcvlen < (1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH + 2)) {
+    if (rcvlen < (1 + VSCP_BINARY_PACKET_FRAME0_HEADER_LENGTH + 2)) {
 
         // Packet to short
         syslog(LOG_ERR,
@@ -344,8 +344,8 @@ udpSrvObj::receiveFrame(int sockfd, CClientItem* pClientItem)
         if (m_bAck) {
             replyNackFrame(
               &from,
-              rcvbuf[VSCP_MULTICAST_PACKET0_POS_PKTTYPE],
-              (rcvbuf[VSCP_MULTICAST_PACKET0_POS_HEAD_LSB] & 0xf8));
+              rcvbuf[VSCP_BINARY_PACKET_FRAME0_POS_PKTTYPE],
+              (rcvbuf[VSCP_BINARY_PACKET_FRAME0_POS_HEAD_LSB] & 0xf8));
         }
         return VSCP_ERROR_ERROR;
     }
@@ -353,15 +353,15 @@ udpSrvObj::receiveFrame(int sockfd, CClientItem* pClientItem)
     // If un-secure frames are not supported
     // frames must be encrypted
     if (!m_bAllowUnsecure && !GET_VSCP_MULTICAST_PACKET_ENCRYPTION(
-                               rcvbuf[VSCP_MULTICAST_PACKET0_POS_PKTTYPE])) {
+                               rcvbuf[VSCP_BINARY_PACKET_FRAME0_POS_PKTTYPE])) {
         syslog(LOG_ERR,
                "UDP receive server: UDP frame must be encrypted (or"
                "m_bAllowUnsecure set to 'true') to be accepted.");
         if (m_bAck) {
             replyNackFrame(
               (struct sockaddr*)&from,
-              rcvbuf[VSCP_MULTICAST_PACKET0_POS_PKTTYPE],
-              (rcvbuf[VSCP_MULTICAST_PACKET0_POS_HEAD_LSB] & 0xf8));
+              rcvbuf[VSCP_BINARY_PACKET_FRAME0_POS_PKTTYPE],
+              (rcvbuf[VSCP_BINARY_PACKET_FRAME0_POS_HEAD_LSB] & 0xf8));
         }
         return VSCP_ERROR_ERROR;
     }
@@ -376,16 +376,16 @@ udpSrvObj::receiveFrame(int sockfd, CClientItem* pClientItem)
         if (m_bAck) {
             replyNackFrame(
               (struct sockaddr*)&from,
-              rcvbuf[VSCP_MULTICAST_PACKET0_POS_PKTTYPE],
-              (rcvbuf[VSCP_MULTICAST_PACKET0_POS_HEAD_LSB] & 0xf8));
+              rcvbuf[VSCP_BINARY_PACKET_FRAME0_POS_PKTTYPE],
+              (rcvbuf[VSCP_BINARY_PACKET_FRAME0_POS_HEAD_LSB] & 0xf8));
         }
         return VSCP_ERROR_ERROR;
     };
 
     if (m_bAck) {
         replyAckFrame((struct sockaddr*)&from,
-                      rcvbuf[VSCP_MULTICAST_PACKET0_POS_PKTTYPE],
-                      (rcvbuf[VSCP_MULTICAST_PACKET0_POS_HEAD_LSB] & 0xf8));
+                      rcvbuf[VSCP_BINARY_PACKET_FRAME0_POS_PKTTYPE],
+                      (rcvbuf[VSCP_BINARY_PACKET_FRAME0_POS_HEAD_LSB] & 0xf8));
     }
 
     // Allocate a new event
@@ -431,7 +431,7 @@ udpSrvObj::receiveFrame(int sockfd, CClientItem* pClientItem)
 int
 udpSrvObj::replyAckFrame(struct sockaddr *to, uint8_t pkttype, uint8_t index)
 {
-    unsigned char sendbuf[VSCP_MULTICAST_PACKET0_MAX];  // Send buffer
+    unsigned char sendbuf[VSCP_BINARY_PACKET_FRAME0_MAX];  // Send buffer
     vscpEventEx ex;
 
     ex.head      = (index & 0xf8);
@@ -459,7 +459,7 @@ udpSrvObj::replyAckFrame(struct sockaddr *to, uint8_t pkttype, uint8_t index)
     size_t slen = sizeof(to);
     if (-1 == sendto(m_sockfd,
                      sendbuf,
-                     1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH + 2 + ex.sizeData,
+                     1 + VSCP_BINARY_PACKET_FRAME0_HEADER_LENGTH + 2 + ex.sizeData,
                      0,
                      (struct sockaddr*)&to,
                      slen)) {
@@ -476,7 +476,7 @@ udpSrvObj::replyAckFrame(struct sockaddr *to, uint8_t pkttype, uint8_t index)
 int
 udpSrvObj::replyNackFrame(struct sockaddr* to, uint8_t pkttype, uint8_t index)
 {
-    unsigned char sendbuf[VSCP_MULTICAST_PACKET0_MAX];  // Send buffer
+    unsigned char sendbuf[VSCP_BINARY_PACKET_FRAME0_MAX];  // Send buffer
     vscpEventEx ex;
 
     ex.head      = (index & 0xf8);
@@ -504,7 +504,7 @@ udpSrvObj::replyNackFrame(struct sockaddr* to, uint8_t pkttype, uint8_t index)
     size_t slen = sizeof(to);
     if (-1 == sendto(m_sockfd,
                      sendbuf,
-                     1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH + 2 + ex.sizeData,
+                     1 + VSCP_BINARY_PACKET_FRAME0_HEADER_LENGTH + 2 + ex.sizeData,
                      0,
                      (struct sockaddr*)&to,
                      slen)) {
