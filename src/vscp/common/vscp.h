@@ -359,6 +359,17 @@ typedef VSCPChannelInfo *PVSCPCHANNELINFO;
 #define VSCP_ENCRYPTION_TOKEN_2 "AES192"
 #define VSCP_ENCRYPTION_TOKEN_3 "AES256"
 
+/*
+  Multicast binary frame
+  ----------------------
+
+  Use the VSCP general binary frame packet position instead of the multicast packet
+  position for the fields that are common between the two frame types. The multicast
+  packet type and encryption type is coded in the first byte of the head field. The
+  multicast packet type is coded in the four most significant bits and the encryption
+  type is coded in the four least significant bits.
+*/
+
 /* * * * Multicast on VSCP reserved IP 224.0.23.158 */
 
 #define VSCP_MULTICAST_IPV4_ADDRESS_STR "224.0.23.158"
@@ -393,41 +404,11 @@ typedef VSCPChannelInfo *PVSCPCHANNELINFO;
 #define VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_MSB  34
 #define VSCP_MULTICAST_PACKET0_POS_VSCP_SIZE_LSB  35
 #define VSCP_MULTICAST_PACKET0_POS_VSCP_DATA      36
-
 /* Two byte CRC follow here and if the frame is encrypted */
 /* the initialization vector follows. */
 
 // Maximum packet size (for buffer allocation)
 #define VSCP_MULTICAST_PACKET0_MAX (1 + VSCP_MULTICAST_PACKET0_HEADER_LENGTH + 2 + VSCP_LEVEL2_MAXDATA + 16)
-
-/* Packet frame format type = 1 (UNIX_NS nanosecond timestamp)  */
-/*      without byte0 and CRC                                   */
-/*      total frame size is 1 + 35 + 2 + data-length            */
-#define VSCP_MULTICAST_PACKET1_HEADER_LENGTH 35
-
-/* Multicast packet1 ordinals */
-#define VSCP_MULTICAST_PACKET1_POS_PKTTYPE        0
-#define VSCP_MULTICAST_PACKET1_POS_HEAD           1
-#define VSCP_MULTICAST_PACKET1_POS_HEAD_MSB       1
-#define VSCP_MULTICAST_PACKET1_POS_HEAD_LSB       2
-#define VSCP_MULTICAST_PACKET1_POS_TIMESTAMP      3  /* 8-byte nanosecond timestamp */
-#define VSCP_MULTICAST_PACKET1_POS_RESERVED1      11 /* Reserved byte 1 */
-#define VSCP_MULTICAST_PACKET1_POS_RESERVED2      12 /* Reserved byte 2 */
-#define VSCP_MULTICAST_PACKET1_POS_RESERVED3      13 /* Reserved byte 3 */
-#define VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS     14
-#define VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_MSB 14
-#define VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_LSB 15
-#define VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE      16
-#define VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_MSB  16
-#define VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_LSB  17
-#define VSCP_MULTICAST_PACKET1_POS_VSCP_GUID      18
-#define VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE      34
-#define VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE_MSB  34
-#define VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE_LSB  35
-#define VSCP_MULTICAST_PACKET1_POS_VSCP_DATA      36
-
-// Maximum packet1 size (for buffer allocation)
-#define VSCP_MULTICAST_PACKET1_MAX (1 + VSCP_MULTICAST_PACKET1_HEADER_LENGTH + 2 + VSCP_LEVEL2_MAXDATA + 16)
 
 /* VSCP multicast packet types */
 #define VSCP_MULTICAST_TYPE_EVENT0 0
@@ -449,11 +430,71 @@ typedef VSCPChannelInfo *PVSCPCHANNELINFO;
 #define VSCP_MULTICAST_PROXY_HEARTBEAT_POS_IFNAME   128 /* Name of interface */
 
 /*
-  Default key for VSCP Server - !!!! should only be used on test systems !!!!
+  VSCP general binary packet
+  --------------------------
+
+  There are two frame types
+
+  0 - Original frame format with 32-bit timestamp in milliseconds plus the year, month, day, hour,
+      minute and second fields.
+  1 - Frame format with Unix timestamp with nanosecond precision since epoch
+
+  The frame types are identified by the frame version bits in the head field. The frame version
+  bits are bits 8 and 9 of the head field. For frame type 0 these bits are 00 and for frame
+  type 1 these bits are 01.
+*/
+
+/* Packet frame format type = 1 (UNIX_NS nanosecond timestamp)  */
+/*      without byte0 and CRC                                   */
+/*      total frame size is 1 + 35 + 2 + data-length            */
+#define VSCP_BINARY_PACKET0_HEADER_LENGTH 35
+
+/* Binary packet1 ordinals */
+#define VSCP_BINARY_PACKET1_POS_PKTTYPE  0
+#define VSCP_BINARY_PACKET1_POS_HEAD     1
+#define VSCP_BINARY_PACKET1_POS_HEAD_MSB 1
+#define VSCP_BINARY_PACKET1_POS_HEAD_LSB 2
+
+// Frame type = 0
+#define VSCP_BINARY_PACKET0_POS_TIMESTAMP 3
+#define VSCP_BINARY_PACKET0_POS_YEAR      7
+#define VSCP_BINARY_PACKET0_POS_YEAR_MSB  7
+#define VSCP_BINARY_PACKET0_POS_YEAR_LSB  8
+#define VSCP_BINARY_PACKET0_POS_MONTH     9
+#define VSCP_BINARY_PACKET0_POS_DAY       10
+#define VSCP_BINARY_PACKET0_POS_HOUR      11
+#define VSCP_BINARY_PACKET0_POS_MINUTE    12
+#define VSCP_BINARY_PACKET0_POS_SECOND    13
+
+// Frame type = 1
+#define VSCP_BINARY_PACKET1_POS_TIMESTAMP 3  /* 64-bit nanosecond timestamp */
+#define VSCP_BINARY_PACKET1_POS_RESERVED1 11 /* Reserved byte 1 */
+#define VSCP_BINARY_PACKET1_POS_RESERVED2 12 /* Reserved byte 2 */
+#define VSCP_BINARY_PACKET1_POS_RESERVED3 13 /* Reserved byte 3 */
+
+#define VSCP_BINARY_PACKET1_POS_VSCP_CLASS     14
+#define VSCP_BINARY_PACKET1_POS_VSCP_CLASS_MSB 14
+#define VSCP_BINARY_PACKET1_POS_VSCP_CLASS_LSB 15
+#define VSCP_BINARY_PACKET1_POS_VSCP_TYPE      16
+#define VSCP_BINARY_PACKET1_POS_VSCP_TYPE_MSB  16
+#define VSCP_BINARY_PACKET1_POS_VSCP_TYPE_LSB  17
+#define VSCP_BINARY_PACKET1_POS_VSCP_GUID      18
+#define VSCP_BINARY_PACKET1_POS_VSCP_SIZE      34
+#define VSCP_BINARY_PACKET1_POS_VSCP_SIZE_MSB  34
+#define VSCP_BINARY_PACKET1_POS_VSCP_SIZE_LSB  35
+#define VSCP_BINARY_PACKET1_POS_VSCP_DATA      36
+/* Two byte CRC follow here and if the frame is encrypted */
+/* the initialization vector follows. */
+
+// Maximum packet1 size (for buffer allocation)
+#define VSCP_BINARY_PACKET1_MAX (1 + VSCP_BINARY_PACKET1_HEADER_LENGTH + 2 + VSCP_LEVEL2_MAXDATA + 16)
+
+/*
+  Default encryption keys for VSCP Server - !!!! should only be used on test systems !!!!
  */
-#define VSCP_DEFAULT_KEY16 "A4A86F7D7E119BA3F0CD06881E371B98"
-#define VSCP_DEFAULT_KEY24 "A4A86F7D7E119BA3F0CD06881E371B989B33B6D606A863B6"
-#define VSCP_DEFAULT_KEY32 "A4A86F7D7E119BA3F0CD06881E371B989B33B6D606A863B633EF529D64544F8E"
+#define VSCP_DEFAULT_KEY16 "A4A86F7D7E119BA3F0CD06881E371B98"                                 // AES-128 key (16 bytes)
+#define VSCP_DEFAULT_KEY24 "A4A86F7D7E119BA3F0CD06881E371B989B33B6D606A863B6"                 // AES-192 key (24 bytes)
+#define VSCP_DEFAULT_KEY32 "A4A86F7D7E119BA3F0CD06881E371B989B33B6D606A863B633EF529D64544F8E" // AES-256 key (32 bytes)
 
 /* Bootloaders */
 #define VSCP_BOOTLOADER_VSCP      0x00 /* VSCP boot loader algorithm */
