@@ -7926,7 +7926,7 @@ vscp_writeEventToFrame(uint8_t *frame, size_t len, uint8_t pkttype, const vscpEv
 
   // Always write packet format 1 - UNIX_NS nanosecond timestamp
   size_t calcSize = 1 +                                                          // Packet type
-                    VSCP_MULTICAST_PACKET1_HEADER_LENGTH + pEvent->sizeData + 2; // CRC
+                    VSCP_BINARY_PACKET0_HEADER_LENGTH + pEvent->sizeData + 2; // CRC
 
   if (len < calcSize) {
     return false;
@@ -7956,54 +7956,54 @@ vscp_writeEventToFrame(uint8_t *frame, size_t len, uint8_t pkttype, const vscpEv
   }
 
   // Frame type - set packet type 1 in upper nibble
-  frame[VSCP_MULTICAST_PACKET1_POS_PKTTYPE] = (pkttype & 0x0f) | (VSCP_MULTICAST_TYPE_EVENT1 << 4);
+  frame[VSCP_BINARY_PACKET0_POS_PKTTYPE] = (pkttype & 0x0f) | (VSCP_MULTICAST_TYPE_EVENT1 << 4);
 
   // Header - set frame version bit to UNIX_NS
   uint16_t head = (pEvent->head & ~VSCP_HEADER16_FRAME_VERSION_MASK) | VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
-  frame[VSCP_MULTICAST_PACKET1_POS_HEAD_MSB] = (head >> 8) & 0xff;
-  frame[VSCP_MULTICAST_PACKET1_POS_HEAD_LSB] = head & 0xff;
+  frame[VSCP_BINARY_PACKET0_POS_HEAD_MSB] = (head >> 8) & 0xff;
+  frame[VSCP_BINARY_PACKET0_POS_HEAD_LSB] = head & 0xff;
 
   // 8-byte nanosecond timestamp
-  frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP]     = (timestamp_ns >> 56) & 0xff;
-  frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 1] = (timestamp_ns >> 48) & 0xff;
-  frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 2] = (timestamp_ns >> 40) & 0xff;
-  frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 3] = (timestamp_ns >> 32) & 0xff;
-  frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 4] = (timestamp_ns >> 24) & 0xff;
-  frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 5] = (timestamp_ns >> 16) & 0xff;
-  frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 6] = (timestamp_ns >> 8) & 0xff;
-  frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 7] = timestamp_ns & 0xff;
+  frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP]     = (timestamp_ns >> 56) & 0xff;
+  frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 1] = (timestamp_ns >> 48) & 0xff;
+  frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 2] = (timestamp_ns >> 40) & 0xff;
+  frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 3] = (timestamp_ns >> 32) & 0xff;
+  frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 4] = (timestamp_ns >> 24) & 0xff;
+  frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 5] = (timestamp_ns >> 16) & 0xff;
+  frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 6] = (timestamp_ns >> 8) & 0xff;
+  frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 7] = timestamp_ns & 0xff;
 
   // Reserved bytes (set to 0)
-  frame[VSCP_MULTICAST_PACKET1_POS_RESERVED1] = 0;
-  frame[VSCP_MULTICAST_PACKET1_POS_RESERVED2] = 0;
-  frame[VSCP_MULTICAST_PACKET1_POS_RESERVED3] = 0;
+  frame[VSCP_BINARY_PACKET0_POS_RESERVED1] = 0;
+  frame[VSCP_BINARY_PACKET0_POS_RESERVED2] = 0;
+  frame[VSCP_BINARY_PACKET0_POS_RESERVED3] = 0;
 
   // Class
-  frame[VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_MSB] = (pEvent->vscp_class >> 8) & 0xff;
-  frame[VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_LSB] = pEvent->vscp_class & 0xff;
+  frame[VSCP_BINARY_PACKET0_POS_VSCP_CLASS_MSB] = (pEvent->vscp_class >> 8) & 0xff;
+  frame[VSCP_BINARY_PACKET0_POS_VSCP_CLASS_LSB] = pEvent->vscp_class & 0xff;
 
   // Type
-  frame[VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_MSB] = (pEvent->vscp_type >> 8) & 0xff;
-  frame[VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_LSB] = pEvent->vscp_type & 0xff;
+  frame[VSCP_BINARY_PACKET0_POS_VSCP_TYPE_MSB] = (pEvent->vscp_type >> 8) & 0xff;
+  frame[VSCP_BINARY_PACKET0_POS_VSCP_TYPE_LSB] = pEvent->vscp_type & 0xff;
 
   // GUID
-  memcpy(frame + VSCP_MULTICAST_PACKET1_POS_VSCP_GUID, pEvent->GUID, 16);
+  memcpy(frame + VSCP_BINARY_PACKET0_POS_VSCP_GUID, pEvent->GUID, 16);
 
   // Size
-  frame[VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE_MSB] = (pEvent->sizeData >> 8) & 0xff;
-  frame[VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE_LSB] = pEvent->sizeData & 0xff;
+  frame[VSCP_BINARY_PACKET0_POS_VSCP_SIZE_MSB] = (pEvent->sizeData >> 8) & 0xff;
+  frame[VSCP_BINARY_PACKET0_POS_VSCP_SIZE_LSB] = pEvent->sizeData & 0xff;
 
   // Data
   if (pEvent->sizeData) {
-    memcpy(frame + VSCP_MULTICAST_PACKET1_POS_VSCP_DATA, pEvent->pdata, pEvent->sizeData);
+    memcpy(frame + VSCP_BINARY_PACKET0_POS_VSCP_DATA, pEvent->pdata, pEvent->sizeData);
   }
 
   // Calculate CRC
-  crc framecrc = crcFast((unsigned char const *) frame + 1, VSCP_MULTICAST_PACKET1_HEADER_LENGTH + pEvent->sizeData);
+  crc framecrc = crcFast((unsigned char const *) frame + 1, VSCP_BINARY_PACKET0_HEADER_LENGTH + pEvent->sizeData);
 
   // CRC
-  frame[1 + VSCP_MULTICAST_PACKET1_HEADER_LENGTH + pEvent->sizeData]     = (framecrc >> 8) & 0xff;
-  frame[1 + VSCP_MULTICAST_PACKET1_HEADER_LENGTH + pEvent->sizeData + 1] = framecrc & 0xff;
+  frame[1 + VSCP_BINARY_PACKET0_HEADER_LENGTH + pEvent->sizeData]     = (framecrc >> 8) & 0xff;
+  frame[1 + VSCP_BINARY_PACKET0_HEADER_LENGTH + pEvent->sizeData + 1] = framecrc & 0xff;
 
 #if 0
     printf("CRC1 %02X %02X\n",
@@ -8098,10 +8098,10 @@ vscp_getEventFromFrame(vscpEvent *pEvent, const uint8_t *buf, size_t len)
     //  len - 1     CRC LSB
 
     size_t calcFrameSize = 1 +                                    // packet type & encryption
-                           VSCP_MULTICAST_PACKET1_HEADER_LENGTH + // header
+                           VSCP_BINARY_PACKET0_HEADER_LENGTH + // header
                            2 +                                    // CRC
-                           ((uint16_t) buf[VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE_MSB] << 8) +
-                           buf[VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE_LSB];
+                           ((uint16_t) buf[VSCP_BINARY_PACKET0_POS_VSCP_SIZE_MSB] << 8) +
+                           buf[VSCP_BINARY_PACKET0_POS_VSCP_SIZE_LSB];
 
     // The buffer must hold a frame
     if (len < calcFrameSize)
@@ -8111,7 +8111,7 @@ vscp_getEventFromFrame(vscpEvent *pEvent, const uint8_t *buf, size_t len)
 
     // CRC check (only if not disabled)
     crc crcnew;
-    if (!((buf[VSCP_MULTICAST_PACKET1_POS_HEAD_LSB] & VSCP_HEADER_NO_CRC) && (VSCP_NOCRC_CALC_DUMMY_CRC == crcFrame))) {
+    if (!((buf[VSCP_BINARY_PACKET0_POS_HEAD_LSB] & VSCP_HEADER_NO_CRC) && (VSCP_NOCRC_CALC_DUMMY_CRC == crcFrame))) {
       // Calculate & check CRC
       crcnew = crcFast((unsigned char const *) buf + 1, (int) calcFrameSize - 1);
       // CRC is zero if calculated over itself
@@ -8121,7 +8121,7 @@ vscp_getEventFromFrame(vscpEvent *pEvent, const uint8_t *buf, size_t len)
     }
 
     pEvent->sizeData =
-      ((uint16_t) buf[VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE_MSB] << 8) + buf[VSCP_MULTICAST_PACKET1_POS_VSCP_SIZE_LSB];
+      ((uint16_t) buf[VSCP_BINARY_PACKET0_POS_VSCP_SIZE_MSB] << 8) + buf[VSCP_BINARY_PACKET0_POS_VSCP_SIZE_LSB];
 
     // Allocate data
     if (pEvent->sizeData) {
@@ -8129,30 +8129,30 @@ vscp_getEventFromFrame(vscpEvent *pEvent, const uint8_t *buf, size_t len)
         return false;
       }
       // copy in data
-      memcpy(pEvent->pdata, buf + VSCP_MULTICAST_PACKET1_POS_VSCP_DATA, pEvent->sizeData);
+      memcpy(pEvent->pdata, buf + VSCP_BINARY_PACKET0_POS_VSCP_DATA, pEvent->sizeData);
     }
     else {
       pEvent->pdata = nullptr;
     }
 
     // Head
-    pEvent->head = ((uint16_t) buf[VSCP_MULTICAST_PACKET1_POS_HEAD_MSB] << 8) + buf[VSCP_MULTICAST_PACKET1_POS_HEAD_LSB];
+    pEvent->head = ((uint16_t) buf[VSCP_BINARY_PACKET0_POS_HEAD_MSB] << 8) + buf[VSCP_BINARY_PACKET0_POS_HEAD_LSB];
 
     // Copy in GUID
-    memcpy(pEvent->GUID, buf + VSCP_MULTICAST_PACKET1_POS_VSCP_GUID, 16);
+    memcpy(pEvent->GUID, buf + VSCP_BINARY_PACKET0_POS_VSCP_GUID, 16);
 
     // Set CRC
     pEvent->crc = crcFrame;
 
     // Set nanosecond timestamp
-    pEvent->timestamp_ns = ((uint64_t) buf[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP] << 56) +
-                           ((uint64_t) buf[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 1] << 48) +
-                           ((uint64_t) buf[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 2] << 40) +
-                           ((uint64_t) buf[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 3] << 32) +
-                           ((uint64_t) buf[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 4] << 24) +
-                           ((uint64_t) buf[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 5] << 16) +
-                           ((uint64_t) buf[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 6] << 8) +
-                           buf[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 7];
+    pEvent->timestamp_ns = ((uint64_t) buf[VSCP_BINARY_PACKET0_POS_TIMESTAMP] << 56) +
+                           ((uint64_t) buf[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 1] << 48) +
+                           ((uint64_t) buf[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 2] << 40) +
+                           ((uint64_t) buf[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 3] << 32) +
+                           ((uint64_t) buf[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 4] << 24) +
+                           ((uint64_t) buf[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 5] << 16) +
+                           ((uint64_t) buf[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 6] << 8) +
+                           buf[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 7];
 
     // If timestamp is zero, set it
     if (0 == pEvent->timestamp_ns) {
@@ -8165,11 +8165,11 @@ vscp_getEventFromFrame(vscpEvent *pEvent, const uint8_t *buf, size_t len)
 
     // VSCP Class
     pEvent->vscp_class =
-      ((uint16_t) buf[VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_MSB] << 8) + buf[VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_LSB];
+      ((uint16_t) buf[VSCP_BINARY_PACKET0_POS_VSCP_CLASS_MSB] << 8) + buf[VSCP_BINARY_PACKET0_POS_VSCP_CLASS_LSB];
 
     // VSCP Type
     pEvent->vscp_type =
-      ((uint16_t) buf[VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_MSB] << 8) + buf[VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_LSB];
+      ((uint16_t) buf[VSCP_BINARY_PACKET0_POS_VSCP_TYPE_MSB] << 8) + buf[VSCP_BINARY_PACKET0_POS_VSCP_TYPE_LSB];
   }
   else {
     // Packet format 0 - Original with microsecond timestamp and datetime fields

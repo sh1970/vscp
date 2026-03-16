@@ -3231,23 +3231,23 @@ TEST(VscpHelper, writeEventToFrame_OriginalFormat)
     EXPECT_EQ(VSCP_MULTICAST_TYPE_EVENT1, GET_VSCP_MULTICAST_PACKET_TYPE(frame[0]));
     
     // Verify class/type positions for packet format 1
-    EXPECT_EQ(0, frame[VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_MSB]);
-    EXPECT_EQ(10, frame[VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_LSB]);
-    EXPECT_EQ(0, frame[VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_MSB]);
-    EXPECT_EQ(6, frame[VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_LSB]);
+    EXPECT_EQ(0, frame[VSCP_BINARY_PACKET0_POS_VSCP_CLASS_MSB]);
+    EXPECT_EQ(10, frame[VSCP_BINARY_PACKET0_POS_VSCP_CLASS_LSB]);
+    EXPECT_EQ(0, frame[VSCP_BINARY_PACKET0_POS_VSCP_TYPE_MSB]);
+    EXPECT_EQ(6, frame[VSCP_BINARY_PACKET0_POS_VSCP_TYPE_LSB]);
     
     // Verify the timestamp was converted from date/time to nanoseconds
     // 2024-01-15 12:30:45 UTC = 1705321845 seconds since epoch
     // Plus 123456789 microseconds = 123456789000 nanoseconds
     uint64_t expectedNs = 1705321845ULL * 1000000000ULL + 123456789ULL * 1000ULL;
-    uint64_t readTs = ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP] << 56) |
-                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 1] << 48) |
-                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 2] << 40) |
-                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 3] << 32) |
-                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 4] << 24) |
-                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 5] << 16) |
-                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 6] << 8) |
-                      frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 7];
+    uint64_t readTs = ((uint64_t)frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP] << 56) |
+                      ((uint64_t)frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 1] << 48) |
+                      ((uint64_t)frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 2] << 40) |
+                      ((uint64_t)frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 3] << 32) |
+                      ((uint64_t)frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 4] << 24) |
+                      ((uint64_t)frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 5] << 16) |
+                      ((uint64_t)frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 6] << 8) |
+                      frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 7];
     EXPECT_EQ(expectedNs, readTs);
     
     delete[] event.pdata;
@@ -3276,20 +3276,20 @@ TEST(VscpHelper, writeEventToFrame_UnixNsFormat)
     EXPECT_EQ(VSCP_MULTICAST_TYPE_EVENT1, GET_VSCP_MULTICAST_PACKET_TYPE(frame[0]));
     
     // Verify class/type positions for packet format 1
-    EXPECT_EQ(0, frame[VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_MSB]);
-    EXPECT_EQ(20, frame[VSCP_MULTICAST_PACKET1_POS_VSCP_CLASS_LSB]);
-    EXPECT_EQ(0, frame[VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_MSB]);
-    EXPECT_EQ(3, frame[VSCP_MULTICAST_PACKET1_POS_VSCP_TYPE_LSB]);
+    EXPECT_EQ(0, frame[VSCP_BINARY_PACKET0_POS_VSCP_CLASS_MSB]);
+    EXPECT_EQ(20, frame[VSCP_BINARY_PACKET0_POS_VSCP_CLASS_LSB]);
+    EXPECT_EQ(0, frame[VSCP_BINARY_PACKET0_POS_VSCP_TYPE_MSB]);
+    EXPECT_EQ(3, frame[VSCP_BINARY_PACKET0_POS_VSCP_TYPE_LSB]);
     
     // Verify 8-byte nanosecond timestamp is written correctly
-    uint64_t readTs = ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP] << 56) |
-                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 1] << 48) |
-                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 2] << 40) |
-                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 3] << 32) |
-                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 4] << 24) |
-                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 5] << 16) |
-                      ((uint64_t)frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 6] << 8) |
-                      frame[VSCP_MULTICAST_PACKET1_POS_TIMESTAMP + 7];
+    uint64_t readTs = ((uint64_t)frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP] << 56) |
+                      ((uint64_t)frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 1] << 48) |
+                      ((uint64_t)frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 2] << 40) |
+                      ((uint64_t)frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 3] << 32) |
+                      ((uint64_t)frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 4] << 24) |
+                      ((uint64_t)frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 5] << 16) |
+                      ((uint64_t)frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 6] << 8) |
+                      frame[VSCP_BINARY_PACKET0_POS_TIMESTAMP + 7];
     EXPECT_EQ(1705315845123456789ULL, readTs);
     
     delete[] event.pdata;
