@@ -527,7 +527,7 @@ TEST(VscpHelper, from_unix_ns)
     uint32_t timestamp;
     
     // Unix epoch
-    vscp_from_unix_ns(0, &year, &month, &day, &hour, &minute, &second, &timestamp);
+    vscp_from_unix_ns(&year, &month, &day, &hour, &minute, &second, &timestamp, 0);
     EXPECT_EQ(1970, year);
     EXPECT_EQ(1, month);
     EXPECT_EQ(1, day);
@@ -544,7 +544,7 @@ TEST(VscpHelper, to_from_unix_ns_roundtrip)
     // Convert back
     int year, month, day, hour, minute, second;
     uint32_t timestamp;
-    vscp_from_unix_ns(original_ns, &year, &month, &day, &hour, &minute, &second, &timestamp);
+    vscp_from_unix_ns(&year, &month, &day, &hour, &minute, &second, &timestamp, original_ns);
     
     EXPECT_EQ(2024, year);
     EXPECT_EQ(6, month);
@@ -3684,6 +3684,227 @@ TEST(FrameVersion, setFrameVersion_switch_versions)
     EXPECT_EQ(VSCP_HEADER16_FRAME_VERSION_ORIGINAL, pEvent->head & VSCP_HEADER16_FRAME_VERSION_MASK);
     
     vscp_deleteEvent_v2(&pEvent);
+}
+
+// =============================================================================
+//                  vscp_writeCommandToFrame / vscp_writeReplyToFrame
+// =============================================================================
+
+TEST(VscpHelper, writeCommandToFrame_basic)
+{
+    uint8_t frame[64];
+    memset(frame, 0, sizeof(frame));
+    uint8_t arg[] = {0xAA, 0xBB, 0xCC};
+    uint16_t command = 0x1234;
+
+    int rv = vscp_writeCommandToFrame(frame, sizeof(frame), command, arg, sizeof(arg));
+    EXPECT_EQ(VSCP_ERROR_SUCCESS, rv);
+
+    // Packet type: command | no encryption
+    EXPECT_EQ(VSCP_BINARY_PACKET_TYPE_COMMAND | VSCP_ENCRYPTION_NONE, frame[0]);
+
+    // Command MSB/LSB
+    EXPECT_EQ(0x12, frame[1]);
+    EXPECT_EQ(0x34, frame[2]);
+
+    // Argument data
+    EXPECT_EQ(0xAA, frame[3]);
+    EXPECT_EQ(0xBB, frame[4]);
+    EXPECT_EQ(0xCC, frame[5]);
+}
+
+TEST(VscpHelper, writeCommandToFrame_no_args)
+{
+    uint8_t frame[64];
+    memset(frame, 0, sizeof(frame));
+    uint16_t command = 0x0001;
+
+    int rv = vscp_writeCommandToFrame(frame, sizeof(frame), command, NULL, 0);
+    EXPECT_EQ(VSCP_ERROR_SUCCESS, rv);
+
+    // Packet type
+    EXPECT_EQ(VSCP_BINARY_PACKET_TYPE_COMMAND | VSCP_ENCRYPTION_NONE, frame[0]);
+
+    // Command
+    EXPECT_EQ(0x00, frame[1]);
+    EXPECT_EQ(0x01, frame[2]);
+}
+
+TEST(VscpHelper, writeCommandToFrame_null_frame)
+{
+    uint8_t arg[] = {0x01};
+    int rv = vscp_writeCommandToFrame(NULL, 64, 0x0001, arg, sizeof(arg));
+    EXPECT_EQ(VSCP_ERROR_PARAMETER, rv);
+}
+
+TEST(VscpHelper, writeCommandToFrame_null_arg_with_nonzero_len)
+{
+    uint8_t frame[64];
+    int rv = vscp_writeCommandToFrame(frame, sizeof(frame), 0x0001, NULL, 5);
+    EXPECT_EQ(VSCP_ERROR_PARAMETER, rv);
+}
+
+TEST(VscpHelper, writeCommandToFrame_buffer_too_small)
+{
+    uint8_t frame[4];  // Too small: need 1 + 2 + 0 + 2 = 5
+    int rv = vscp_writeCommandToFrame(frame, sizeof(frame), 0x0001, NULL, 0);
+    EXPECT_EQ(VSCP_ERROR_BUFFER_TO_SMALL, rv);
+}
+
+TEST(VscpHelper, writeCommandToFrame_buffer_exact_size)
+{
+    uint8_t frame[5];  // Exact: 1 pkttype + 2 cmd + 0 arg + 2 crc
+    memset(frame, 0, sizeof(frame));
+    int rv = vscp_writeCommandToFrame(frame, sizeof(frame), 0x0042, NULL, 0);
+    EXPECT_EQ(VSCP_ERROR_SUCCESS, rv);
+    EXPECT_EQ(VSCP_BINARY_PACKET_TYPE_COMMAND | VSCP_ENCRYPTION_NONE, frame[0]);
+    EXPECT_EQ(0x00, frame[1]);
+    EXPECT_EQ(0x42, frame[2]);
+}
+
+TEST(VscpHelper, writeCommandToFrame_command_zero)
+{
+    uint8_t frame[64];
+    memset(frame, 0, sizeof(frame));
+    int rv = vscp_writeCommandToFrame(frame, sizeof(frame), 0x0000, NULL, 0);
+    EXPECT_EQ(VSCP_ERROR_SUCCESS, rv);
+    EXPECT_EQ(0x00, frame[1]);
+    EXPECT_EQ(0x00, frame[2]);
+}
+
+// --- vscp_writeReplyToFrame tests ---
+
+TEST(VscpHelper, writeReplyToFrame_basic)
+{
+    uint8_t frame[64];
+    memset(frame, 0, sizeof(frame));
+    uint8_t arg[] = {0xDE, 0xAD};
+    uint16_t command = 0x5678;
+    uint16_t error   = 0x0001;
+
+    int rv = vscp_writeReplyToFrame(frame, sizeof(frame), command, error, arg, sizeof(arg));
+    EXPECT_EQ(VSCP_ERROR_SUCCESS, rv);
+
+    // Packet type: response | no encryption
+    EXPECT_EQ(VSCP_BINARY_PACKET_TYPE_RESPONSE | VSCP_ENCRYPTION_NONE, frame[0]);
+
+    // Command MSB/LSB
+    EXPECT_EQ(0x56, frame[1]);
+    EXPECT_EQ(0x78, frame[2]);
+
+    // Error MSB/LSB
+    EXPECT_EQ(0x00, frame[3]);
+    EXPECT_EQ(0x01, frame[4]);
+
+    // Argument data
+    EXPECT_EQ(0xDE, frame[5]);
+    EXPECT_EQ(0xAD, frame[6]);
+}
+
+TEST(VscpHelper, writeReplyToFrame_no_args)
+{
+    uint8_t frame[64];
+    memset(frame, 0, sizeof(frame));
+    uint16_t command = 0x0010;
+    uint16_t error   = 0x0000;
+
+    int rv = vscp_writeReplyToFrame(frame, sizeof(frame), command, error, NULL, 0);
+    EXPECT_EQ(VSCP_ERROR_SUCCESS, rv);
+
+    // Packet type
+    EXPECT_EQ(VSCP_BINARY_PACKET_TYPE_RESPONSE | VSCP_ENCRYPTION_NONE, frame[0]);
+
+    // Command
+    EXPECT_EQ(0x00, frame[1]);
+    EXPECT_EQ(0x10, frame[2]);
+
+    // Error
+    EXPECT_EQ(0x00, frame[3]);
+    EXPECT_EQ(0x00, frame[4]);
+}
+
+TEST(VscpHelper, writeReplyToFrame_null_frame)
+{
+    uint8_t arg[] = {0x01};
+    int rv = vscp_writeReplyToFrame(NULL, 64, 0x0001, 0x0000, arg, sizeof(arg));
+    EXPECT_EQ(VSCP_ERROR_PARAMETER, rv);
+}
+
+TEST(VscpHelper, writeReplyToFrame_null_arg_with_nonzero_len)
+{
+    uint8_t frame[64];
+    int rv = vscp_writeReplyToFrame(frame, sizeof(frame), 0x0001, 0x0000, NULL, 5);
+    EXPECT_EQ(VSCP_ERROR_PARAMETER, rv);
+}
+
+TEST(VscpHelper, writeReplyToFrame_buffer_too_small)
+{
+    uint8_t frame[6];  // Too small: need 1 + 2 + 2 + 0 + 2 = 7
+    int rv = vscp_writeReplyToFrame(frame, sizeof(frame), 0x0001, 0x0000, NULL, 0);
+    EXPECT_EQ(VSCP_ERROR_BUFFER_TO_SMALL, rv);
+}
+
+TEST(VscpHelper, writeReplyToFrame_buffer_exact_size)
+{
+    uint8_t frame[7];  // Exact: 1 pkttype + 2 cmd + 2 err + 0 arg + 2 crc
+    memset(frame, 0, sizeof(frame));
+    int rv = vscp_writeReplyToFrame(frame, sizeof(frame), 0x00FF, 0x0002, NULL, 0);
+    EXPECT_EQ(VSCP_ERROR_SUCCESS, rv);
+    EXPECT_EQ(VSCP_BINARY_PACKET_TYPE_RESPONSE | VSCP_ENCRYPTION_NONE, frame[0]);
+    EXPECT_EQ(0x00, frame[1]);
+    EXPECT_EQ(0xFF, frame[2]);
+    EXPECT_EQ(0x00, frame[3]);
+    EXPECT_EQ(0x02, frame[4]);
+}
+
+TEST(VscpHelper, writeReplyToFrame_large_args)
+{
+    uint8_t frame[512];
+    memset(frame, 0, sizeof(frame));
+    uint8_t arg[256];
+    for (int i = 0; i < 256; i++) arg[i] = (uint8_t) i;
+
+    int rv = vscp_writeReplyToFrame(frame, sizeof(frame), 0xABCD, 0x0000, arg, sizeof(arg));
+    EXPECT_EQ(VSCP_ERROR_SUCCESS, rv);
+
+    // Verify packet type
+    EXPECT_EQ(VSCP_BINARY_PACKET_TYPE_RESPONSE | VSCP_ENCRYPTION_NONE, frame[0]);
+
+    // Verify command
+    EXPECT_EQ(0xAB, frame[1]);
+    EXPECT_EQ(0xCD, frame[2]);
+
+    // Verify error
+    EXPECT_EQ(0x00, frame[3]);
+    EXPECT_EQ(0x00, frame[4]);
+
+    // Verify argument data integrity
+    for (int i = 0; i < 256; i++) {
+        EXPECT_EQ((uint8_t) i, frame[5 + i]);
+    }
+}
+
+TEST(VscpHelper, writeCommandToFrame_large_args)
+{
+    uint8_t frame[512];
+    memset(frame, 0, sizeof(frame));
+    uint8_t arg[256];
+    for (int i = 0; i < 256; i++) arg[i] = (uint8_t)(255 - i);
+
+    int rv = vscp_writeCommandToFrame(frame, sizeof(frame), 0xBEEF, arg, sizeof(arg));
+    EXPECT_EQ(VSCP_ERROR_SUCCESS, rv);
+
+    // Verify packet type
+    EXPECT_EQ(VSCP_BINARY_PACKET_TYPE_COMMAND | VSCP_ENCRYPTION_NONE, frame[0]);
+
+    // Verify command
+    EXPECT_EQ(0xBE, frame[1]);
+    EXPECT_EQ(0xEF, frame[2]);
+
+    // Verify argument data integrity
+    for (int i = 0; i < 256; i++) {
+        EXPECT_EQ((uint8_t)(255 - i), frame[3 + i]);
+    }
 }
 
 // Entry point for Google Test

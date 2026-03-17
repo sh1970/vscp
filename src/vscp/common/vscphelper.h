@@ -929,7 +929,6 @@ vscp_to_unix_ns(int year, int month, int day, int hour, int minute, int second, 
 /*!
   @fn vscp_from_unix_ns
   Convert unix time in nanoseconds to date and time
-  @param unix_ns Unix time in nanoseconds
   @param year Year
   @param month Month
   @param day Day
@@ -937,17 +936,18 @@ vscp_to_unix_ns(int year, int month, int day, int hour, int minute, int second, 
   @param minute Minute
   @param second Second
   @param timestamp Timestamp in microseconds
+  @param unix_ns Unix time in nanoseconds
 */
 
 void
-vscp_from_unix_ns(int64_t unix_ns,
-                  int *year,
+vscp_from_unix_ns(int *year,
                   int *month,
                   int *day,
                   int *hour,
                   int *minute,
                   int *second,
-                  uint32_t *timestamp);
+                  uint32_t *timestamp,
+                  int64_t unix_ns);
 
 /*!
   @fn vscp_XML_Escape
@@ -2979,7 +2979,55 @@ vscp_getEventFromFrame(vscpEvent *pEvent, const uint8_t *buf, size_t len);
 bool
 vscp_getEventExFromFrame(vscpEventEx *pEventEx, const uint8_t *buf, size_t len);
 
-/*!  TODO DOC
+/*!
+  @fn vscp_writeCommandToFrame
+  Write a command to a binary frame.
+
+  The command is written in the same format as the command part of a reply frame,
+  but without the error code and with the command code in place of the error code.
+  This allows the command to be used in both command frames and reply frames.
+
+  @param frame Buffer that will receive the command frame. Should be at least
+               3 bytes long to hold the command code and at least one byte
+               of argument.
+  @param len Size of the buffer.
+  @param command Command code to write to frame.
+  @param arg Optional argument data to include in the frame. Can be NULL if no
+             argument data is needed.
+  @param arg_len Length of argument data. Should be zero if arg is NULL.
+  @return True on success, false on failure.
+ */
+int
+vscp_writeCommandToFrame(uint8_t *frame, size_t len, uint16_t command, const uint8_t *arg, size_t arg_len);
+
+/*!
+  @fn vscp_writeReplyToFrame
+  Write a reply to a binary frame.
+
+  The reply is written in the same format as the command part of a reply frame,
+  but with the command code in place of the error code. This allows the reply
+  to be used in both command frames and reply frames.
+
+  @param frame Buffer that will receive the reply frame. Should be at least
+               3 bytes long to hold the command code, error code, and at least
+               one byte of argument.
+  @param len Size of the buffer.
+  @param command Command code to write to frame.
+  @param error Error code to write to frame.
+  @param arg Optional argument data to include in the frame. Can be NULL if no
+             argument data is needed.
+  @param arg_len Length of argument data. Should be zero if arg is NULL.
+  @return True on success, false on failure.
+*/
+int
+vscp_writeReplyToFrame(uint8_t *frame,
+                             size_t len,
+                             uint16_t command,
+                             uint16_t error,
+                             const uint8_t *arg,
+                             size_t arg_len);
+
+/*!
   @fn vscp_getBootLoaderDescription
   Get a pointer to a bootloader description string from boot loader code
   @param code Boot loader code to get description for
