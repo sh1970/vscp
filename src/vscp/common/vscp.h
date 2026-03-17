@@ -452,9 +452,9 @@ typedef VSCPChannelInfo *PVSCPCHANNELINFO;
 #define GET_VSCP_BINARY_PACKET_ENCRYPTION(type) ((type) & 0x0f)
 
 // Packet types in the first bytes high nibble of the head field for binary packets
-#define VSCP_BINARY_PKTTYPE_EVENT    0x00 // Events
-#define VSCP_BINARY_PKTTYPE_COMMAND  0xe0 // Commands
-#define VSCP_BINARY_PKTTYPE_RESPONSE 0xf0 // Replies to commands
+#define VSCP_BINARY_PACKET_TYPE_EVENT    0x00 // Events
+#define VSCP_BINARY_PACKET_TYPE_COMMAND  0xe0 // Commands
+#define VSCP_BINARY_PACKET_TYPE_RESPONSE 0xf0 // Replies to commands
 
 /* Packet frame format type = 1 (UNIX_NS nanosecond timestamp)  */
 /*      without byte0 and CRC                                   */
@@ -809,6 +809,7 @@ struct vscpMyNode {
 #define VSCP_ERROR_INTERFACE          68 /* Interface error (not defined etc) */
 #define VSCP_ERROR_INVALID_FORMAT     69 /* Format is wrong. Error in conversion */
 #define VSCP_ERROR_INVALID_CONTEXT    70 /* Context is invalid or missing */
+#define VSCP_ERROR_UNSUPPORTED        71 /* Not supported */
 
 /*!
   A timestamp that is less than this value is considered to be an event that should
