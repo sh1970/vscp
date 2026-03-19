@@ -1576,8 +1576,9 @@ CMDF_Setup::clearStorage(void)
 CMDF::CMDF()
   : CMDF_Object(mdf_type_mdf)
 {
-  m_strLocale = "en";
-  m_vscpLevel = VSCP_LEVEL1;
+  m_strLocale         = "en";
+  m_vscpLevel         = VSCP_LEVEL1;
+  m_module_bufferSize = 0;
 }
 
 CMDF::~CMDF()
