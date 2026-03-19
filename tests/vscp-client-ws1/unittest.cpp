@@ -553,8 +553,10 @@ TEST(VscpClientWs1, EncryptPasswordDeterministic)
   uint8_t iv2[16] = { 0 };
   std::string result1, result2;
 
-  client.encrypt_password(result1, "user", "pass", key, iv1);
-  client.encrypt_password(result2, "user", "pass", key, iv2);
+  // Use input that is exactly 16 bytes ("admin" + ":" + "0123456789") = 16
+  // to avoid AES reading uninitialized memory beyond the string buffer
+  client.encrypt_password(result1, "admin", "0123456789", key, iv1);
+  client.encrypt_password(result2, "admin", "0123456789", key, iv2);
   EXPECT_EQ(result1, result2);
 }
 
