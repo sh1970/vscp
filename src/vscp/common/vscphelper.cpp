@@ -313,6 +313,8 @@ vscp_sem_wait(sem_t *sem, uint32_t waitms)
   return sem_timedwait(sem, &ts);
 #else
   // Portable version using sem_trywait with polling (macOS, BSD, other Unix)
+  // Note: macOS does not support unnamed semaphores (sem_init returns ENOSYS).
+  // In that case sem_trywait returns EINVAL which we treat as "not available".
   uint32_t elapsed        = 0;
   const uint32_t sleep_ms = 1; // Sleep 1ms between attempts
 
@@ -321,7 +323,7 @@ vscp_sem_wait(sem_t *sem, uint32_t waitms)
       return 0; // Successfully acquired semaphore
     }
 
-    if (errno != EAGAIN) {
+    if (errno != EAGAIN && errno != EINVAL) {
       return -1; // Real error
     }
 
