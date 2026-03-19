@@ -549,11 +549,12 @@ TEST(VscpClientWs1, EncryptPasswordDeterministic)
 {
   vscpClientWs1 client;
   uint8_t key[32] = { 0 };
-  uint8_t iv[16]  = { 0 };
+  uint8_t iv1[16] = { 0 };
+  uint8_t iv2[16] = { 0 };
   std::string result1, result2;
 
-  client.encrypt_password(result1, "user", "pass", key, iv);
-  client.encrypt_password(result2, "user", "pass", key, iv);
+  client.encrypt_password(result1, "user", "pass", key, iv1);
+  client.encrypt_password(result2, "user", "pass", key, iv2);
   EXPECT_EQ(result1, result2);
 }
 
