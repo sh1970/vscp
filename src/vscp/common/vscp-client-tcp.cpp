@@ -285,6 +285,14 @@ vscpClientTcp::connect(void)
 {
   int rv;
 
+  // Propagate TLS settings to the remote tcp/ip interfaces
+  if (m_bTLS) {
+    m_tcp.setTLSOptions(m_bVerifyPeer, m_cafile, m_capath,
+                        m_certfile, m_keyfile, m_pwKeyfile);
+    m_tcpReceive.setTLSOptions(m_bVerifyPeer, m_cafile, m_capath,
+                               m_certfile, m_keyfile, m_pwKeyfile);
+  }
+
   if (m_bPolling) {
     return m_tcp.doCmdOpen(m_strHostname, m_strUsername, m_strPassword);
   }

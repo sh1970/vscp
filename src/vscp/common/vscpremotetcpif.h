@@ -718,6 +718,63 @@ class VscpRemoteTcpIf
      */
     size_t getInputQueueCount(void);
 
+    // ------------------------------------------------------------------------
+    //                                 TLS / SSL
+    // ------------------------------------------------------------------------
+
+    /*!
+        Enable TLS/SSL for the connection.
+        When set, doCmdOpen will use stcp_connect_remote_secure()
+        instead of stcp_connect_remote().
+    */
+    void enableTLS(bool bEnable = true) { m_bTLS = bEnable; };
+
+    /*!
+        Set TLS/SSL options
+        @param bVerifyPeer If true, verify the server certificate.
+        @param cafile Path to CA certificate file.
+        @param capath Path to CA certificate directory.
+        @param certfile Path to client certificate file.
+        @param keyfile Path to client private key file.
+        @param pwKeyfile Password for the private key file.
+    */
+    void setTLSOptions(bool bVerifyPeer,
+                       const std::string &cafile = "",
+                       const std::string &capath = "",
+                       const std::string &certfile = "",
+                       const std::string &keyfile = "",
+                       const std::string &pwKeyfile = "")
+    {
+        m_bTLS = true;
+        m_bVerifyPeer = bVerifyPeer;
+        m_cafile = cafile;
+        m_capath = capath;
+        m_certfile = certfile;
+        m_keyfile = keyfile;
+        m_pwKeyfile = pwKeyfile;
+    };
+
+    /// Enable TLS/SSL
+    bool m_bTLS;
+
+    /// Verify peer certificate
+    bool m_bVerifyPeer;
+
+    /// CA file
+    std::string m_cafile;
+
+    /// Path to CA certificates
+    std::string m_capath;
+
+    /// Path to client certificate file
+    std::string m_certfile;
+
+    /// Path to client key file
+    std::string m_keyfile;
+
+    /// Password for key file
+    std::string m_pwKeyfile;
+
     /*!
         The connection structure
         Not NULL if connected.

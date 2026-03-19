@@ -84,6 +84,9 @@ VscpRemoteTcpIf::VscpRemoteTcpIf()
 {
   m_conn = NULL; // Not yet used
 
+  m_bTLS        = false;
+  m_bVerifyPeer = false;
+
   m_bModeReceiveLoop     = false;
   m_connectionTimeOut    = TCPIP_DEFAULT_CONNECT_TIMEOUT_SECONDS;
   m_responseTimeOut      = TCPIP_DEFAULT_RESPONSE_TIMEOUT;
@@ -337,6 +340,7 @@ VscpRemoteTcpIf::doCmdOpen(const std::string &strInterface, uint32_t flags)
 
   // Interface can be given as
   //      tcp://host:port;username;password
+  //      stcp://host:port;username;password  (SSL/TLS connection)
   //      or
   //      host:port;username;password
 
@@ -348,8 +352,14 @@ VscpRemoteTcpIf::doCmdOpen(const std::string &strInterface, uint32_t flags)
     strHostname = tokens.front();
     tokens.pop_front();
     vscp_trim(strHostname);
-    std::string prefix = "tcp://";
-    vscp_startsWith(strHostname, prefix, &strHostname); // Remove "tcp://"
+    // Check for stcp:// prefix (secure connection)
+    std::string strLower = vscp_lower(strHostname);
+    if (vscp_startsWith(strLower, "stcp://", &strHostname)) {
+      m_bTLS = true;
+    } else {
+      std::string prefix = "tcp://";
+      vscp_startsWith(strHostname, prefix, &strHostname); // Remove "tcp://"
+    }
   }
 
 #ifdef DEBUG_LIB_VSCP_HELPER
@@ -401,7 +411,14 @@ VscpRemoteTcpIf::doCmdOpen(const std::string &strHostname,
 
   std::string strHost = vscp_lower(strHostname);
   vscp_trim(strHost);
-  vscp_startsWith(strHost, "tcp://", &strHost); // Remove "tcp://" if there
+
+  // Check for stcp:// prefix (secure connection)
+  bool bSecure = m_bTLS;
+  if (vscp_startsWith(strHost, "stcp://", &strHost)) {
+    bSecure = true;
+  } else {
+    vscp_startsWith(strHost, "tcp://", &strHost); // Remove "tcp://" if there
+  }
 
   std::deque<std::string> tokens;
   vscp_split(tokens, strHost, ":");
@@ -413,7 +430,31 @@ VscpRemoteTcpIf::doCmdOpen(const std::string &strHostname,
   port = (int) vscp_readStringValue(tokens.front());
   tokens.pop_front();
 
-  m_conn = stcp_connect_remote((const char *)host.c_str(), port, m_connectionTimeOut);
+  if (bSecure) {
+    struct stcp_secure_options opts;
+    memset(&opts, 0, sizeof(opts));
+
+    if (!m_cafile.empty()) {
+      opts.ca_file = m_cafile.c_str();
+    }
+    if (!m_capath.empty()) {
+      opts.ca_path = m_capath.c_str();
+    }
+    if (!m_certfile.empty()) {
+      opts.client_cert_path = m_certfile.c_str();
+    }
+    if (!m_keyfile.empty()) {
+      opts.pem = m_keyfile.c_str();
+    }
+    opts.verify_peer = m_bVerifyPeer ? 1 : 0;
+
+    m_conn = stcp_connect_remote_secure(
+      (const char *)host.c_str(), port, &opts, m_connectionTimeOut);
+  } else {
+    m_conn = stcp_connect_remote(
+      (const char *)host.c_str(), port, m_connectionTimeOut);
+  }
+
   if (NULL == m_conn) {
 
 #ifdef DEBUG_LIB_VSCP_HELPER
