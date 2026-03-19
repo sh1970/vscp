@@ -65,7 +65,7 @@ vscpClientCanal::vscpClientCanal()
 {
   m_type       = CVscpClient::connType::CANAL;
   m_bConnected = false; // Not connected
-  // m_tid = 0;
+  m_tid = 0;
   m_bRun = true;
 
   vscp_clearVSCPFilter(&m_filterIn); // Accept all events
@@ -251,17 +251,21 @@ int
 vscpClientCanal::disconnect(void)
 {
   m_bRun = false;
+
+  // Only wait for thread if we were connected (thread was started)
+  if (m_bConnected) {
 #ifdef WIN32
-  Sleep(1000);
+    Sleep(1000);
 #else
-  sleep(1); // Give thread some time to die
+    sleep(1); // Give thread some time to die
 #endif
 
-  pthread_mutex_unlock(&m_mutexif);
-  if (isCallbackEvActive() || isCallbackExActive()) {
-    pthread_join(m_tid, NULL);
+    pthread_mutex_unlock(&m_mutexif);
+    if (isCallbackEvActive() || isCallbackExActive()) {
+      pthread_join(m_tid, NULL);
+    }
+    pthread_mutex_destroy(&m_mutexif);
   }
-  pthread_mutex_destroy(&m_mutexif);
 
   m_bConnected = false;
   spdlog::debug("CANAL CLIENT: Disconnect");

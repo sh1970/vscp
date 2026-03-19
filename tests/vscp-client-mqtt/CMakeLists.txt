@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.10)
 
 # set the project name
-project(test LANGUAGES CXX C)
+project(test_vscp_client_mqtt LANGUAGES CXX C)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 # specify the C++ standard
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # set the module path
@@ -14,9 +14,13 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules)
 
 message(STATUS "Build dir: " ${PROJECT_SOURCE_DIR})
 
+# Locate GTest
+find_package(GTest REQUIRED)
+include_directories(${GTEST_INCLUDE_DIRS})
+
 find_package(OpenSSL REQUIRED)
 
-# TODO Check SLL version and set variable accordingly
+# TODO Check SSL version and set variable accordingly
 set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -DOPENSSL_API_1_1")
 set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -DOPENSSL_API_1_1")
 
@@ -24,23 +28,29 @@ include(FindEXPAT)
 find_package(EXPAT REQUIRED)
 include_directories(${EXPAT_INCLUDE_DIRS})
 
+# pthreads
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
+find_package(spdlog REQUIRED)
+
 include(FindMosquitto)
 
 # add the executable
-add_executable(test 
-    test-vscp-client-mqtt.cpp
+add_executable(unittest_vscp_client_mqtt
+    ${PROJECT_SOURCE_DIR}/unittest.cpp
+    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscp-client-mqtt.h
+    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscp-client-mqtt.cpp
+    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscp-client-base.h
+    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscp-client-base.cpp
+    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscpcanaldeviceif.h
+    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscpcanaldeviceif.cpp
     ${PROJECT_SOURCE_DIR}/../../src/vscp/common/guid.h
     ${PROJECT_SOURCE_DIR}/../../src/vscp/common/guid.cpp
     ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscphelper.h
+    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscphelper.cpp
     ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscpdatetime.cpp
     ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscpdatetime.h
-    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscphelper.cpp
-    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscpcanaldeviceif.h
-    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscpcanaldeviceif.cpp
-    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscp_client_base.h
-    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscp_client_base.cpp
-    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscp_client_mqtt.h
-    ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscp_client_mqtt.cpp
     ${PROJECT_SOURCE_DIR}/../../src/vscp/common/vscp.h
     ${PROJECT_SOURCE_DIR}/../../src/common/vscpbase64.h
     ${PROJECT_SOURCE_DIR}/../../src/common/vscpbase64.c
@@ -52,29 +62,27 @@ add_executable(test
     ${PROJECT_SOURCE_DIR}/../../src/common/crc8.c
     ${PROJECT_SOURCE_DIR}/../../src/common/vscp-aes.h
     ${PROJECT_SOURCE_DIR}/../../src/common/vscp-aes.c
-    ${PROJECT_SOURCE_DIR}/../../src/common/fastpbkdf2.h
-    ${PROJECT_SOURCE_DIR}/../../src/common/fastpbkdf2.c
-    ${PROJECT_SOURCE_DIR}/../../src/common/third_party/nlohmann/json.hpp
-    )
+)
 
-target_include_directories(test PUBLIC 
+target_include_directories(unittest_vscp_client_mqtt PUBLIC
     ${PROJECT_SOURCE_DIR}/../../src/vscp/common/
     ${PROJECT_SOURCE_DIR}/../../src/common/
-    ${PROJECT_SOURCE_DIR}/../../src/common/third_party
-    ${PROJECT_SOURCE_DIR}/../../src/common/third_party/nlohmann
-    ${PROJECT_SOURCE_DIR}/../../src/common/third_party/spdlog-1.8.5/include/
+    ${PROJECT_SOURCE_DIR}/../../third_party/nlohmann/include
+    ${PROJECT_SOURCE_DIR}/../../third_party/spdlog/include
+    ${PROJECT_SOURCE_DIR}/../../third_party/mustache/
     ${OPENSSL_INCLUDE_DIR}
     ${EXPAT_INCLUDE_DIRS}
     ${MOSQUITTO_INCLUDE_DIR}
-    )
+)
 
-target_link_libraries(test PRIVATE m
+target_link_libraries(unittest_vscp_client_mqtt PRIVATE
+    m
     dl
     pthread
     OpenSSL::SSL OpenSSL::Crypto
     ${OPENSSL_LIBRARIES}
     ${EXPAT_LIBRARIES}
     ${MOSQUITTO_LIBRARIES}
-    )    
-
-#add_library(MathFunctions mysqrt.cxx)
+    gtest
+    gtest_main
+)
