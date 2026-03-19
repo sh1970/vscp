@@ -89,7 +89,7 @@ jobs:
     - name: Install dependencies via Homebrew
       run: |
         brew update
-        brew install googletest openssl@3 expat mosquitto
+        brew install googletest openssl@3 expat mosquitto cjson
 
     - name: Create test build directory
       run: cmake -E make_directory ${{github.workspace}}/tests/build
@@ -101,10 +101,11 @@ jobs:
         EXPAT_PREFIX=$(brew --prefix expat)
         GTEST_PREFIX=$(brew --prefix googletest)
         MOSQUITTO_PREFIX=$(brew --prefix mosquitto)
+        CJSON_PREFIX=$(brew --prefix cjson)
         cmake .. -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
           -DOPENSSL_ROOT_DIR=${OPENSSL_PREFIX} \
-          -DCMAKE_PREFIX_PATH="${OPENSSL_PREFIX};${EXPAT_PREFIX};${GTEST_PREFIX};${MOSQUITTO_PREFIX}" \
-          -DCMAKE_CXX_FLAGS="-I${GTEST_PREFIX}/include" \
+          -DCMAKE_PREFIX_PATH="${OPENSSL_PREFIX};${EXPAT_PREFIX};${GTEST_PREFIX};${MOSQUITTO_PREFIX};${CJSON_PREFIX}" \
+          -DCMAKE_CXX_FLAGS="-I${GTEST_PREFIX}/include -I${CJSON_PREFIX}/include" \
           -DCMAKE_EXE_LINKER_FLAGS="-L${GTEST_PREFIX}/lib"
 
     - name: Build unit tests
