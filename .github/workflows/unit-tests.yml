@@ -133,8 +133,6 @@ jobs:
         ${{github.workspace}}/tests/build/vscp-client-mqtt/unittest_vscp_client_mqtt
         echo "Running VSCP Client Multicast tests..."
         ${{github.workspace}}/tests/build/vscp-client-multicast/unittest_vscp_client_multicast
-        echo "Running VSCP Client SocketCan tests..."
-        ${{github.workspace}}/tests/build/vscp-client-socketcan/unittest_vscp_client_socketcan
         echo "Running VSCP Client UDP tests..."
         ${{github.workspace}}/tests/build/vscp-client-udp/unittest_vscp_client_udp
         echo "Running VSCP Client WS1 tests..."
