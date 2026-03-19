@@ -16,6 +16,7 @@ add_subdirectory(guid)
 add_subdirectory(vscpdatetime)
 add_subdirectory(vscphelper)
 add_subdirectory(mdfparser)
+add_subdirectory(tcpiptls)
 
 # Custom target to run all tests
 # Note: mdfparser must run from its source directory for relative file paths
@@ -24,6 +25,7 @@ add_custom_target(test
     COMMAND ${CMAKE_CURRENT_BINARY_DIR}/vscpdatetime/unittest_datetime
     COMMAND ${CMAKE_CURRENT_BINARY_DIR}/vscphelper/unittest_vscphelper
     COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_CURRENT_SOURCE_DIR}/mdfparser ${CMAKE_CURRENT_BINARY_DIR}/mdfparser/unittest_mdfparser
-    DEPENDS unittest_guid unittest_datetime unittest_vscphelper unittest_mdfparser
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/tcpiptls/unittest_tcpiptls
+    DEPENDS unittest_guid unittest_datetime unittest_vscphelper unittest_mdfparser unittest_tcpiptls
     COMMENT "Running all unit tests"
 )

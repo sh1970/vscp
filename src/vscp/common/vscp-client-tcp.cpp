@@ -57,6 +57,9 @@ vscpClientTcp::vscpClientTcp()
   m_bPolling = false;
   m_obid     = 0;
 
+  m_bTLS        = false;
+  m_bVerifyPeer = false;
+
   vscp_clearVSCPFilter(&m_filterIn);  // Accept all events
   vscp_clearVSCPFilter(&m_filterOut); // Send all events
 
