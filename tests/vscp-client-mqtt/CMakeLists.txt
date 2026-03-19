@@ -32,8 +32,6 @@ include_directories(${EXPAT_INCLUDE_DIRS})
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-find_package(spdlog REQUIRED)
-
 include(FindMosquitto)
 
 # add the executable

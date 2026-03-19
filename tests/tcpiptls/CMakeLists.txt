@@ -29,8 +29,6 @@ include_directories(${EXPAT_INCLUDE_DIRS})
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-find_package(spdlog REQUIRED)
-
 # add the executable
 add_executable(unittest_tcpiptls
     ${PROJECT_SOURCE_DIR}/unittest.cpp
@@ -79,7 +77,6 @@ target_link_libraries(unittest_tcpiptls PRIVATE
     ${OPENSSL_LIBRARIES}
     ${EXPAT_LIBRARIES}
     ${GTEST_LIBRARIES}
-    spdlog::spdlog
     gtest
     gtest_main
 )
