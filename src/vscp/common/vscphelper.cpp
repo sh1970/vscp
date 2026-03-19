@@ -329,7 +329,8 @@ vscp_sem_wait(sem_t *sem, uint32_t waitms)
     elapsed += sleep_ms;
   }
 
-  return ETIMEDOUT; // Timeout
+  errno = ETIMEDOUT;
+  return -1; // Timeout
 #endif
 }
 #endif
