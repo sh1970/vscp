@@ -154,6 +154,7 @@
       "make": true,
       "./build/test": true,
       "timeout": true,
-      "./vscp-client-mqtt/unittest_vscp_client_mqtt": true
+      "./vscp-client-mqtt/unittest_vscp_client_mqtt": true,
+      "./vscp-client-multicast/unittest_vscp_client_multicast": true
     }
 }

@@ -85,6 +85,7 @@ vscpClientMulticast::vscpClientMulticast()
   m_multicastGroupAddr = DEFAULT_MULTICAST_GROUP;
   m_multicastPort      = DEFAULT_MULTICAST_PORT;
   m_ttl                = 1;
+  m_bRun               = true;
   m_bEncrypt           = false;
   m_encryptType        = VSCP_ENCRYPTION_NONE;
   memset(m_key, 0, sizeof(m_key));
