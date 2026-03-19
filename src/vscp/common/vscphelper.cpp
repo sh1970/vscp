@@ -311,10 +311,14 @@ vscp_sem_wait(sem_t *sem, uint32_t waitms)
   ts.tv_nsec = ns % 1000000000;
 
   return sem_timedwait(sem, &ts);
+#elif defined(__APPLE__)
+  // macOS does not support unnamed POSIX semaphores (sem_init returns ENOSYS).
+  // Since the semaphore is non-functional, just sleep for the timeout period.
+  usleep(waitms * 1000);
+  errno = ETIMEDOUT;
+  return -1;
 #else
-  // Portable version using sem_trywait with polling (macOS, BSD, other Unix)
-  // Note: macOS does not support unnamed semaphores (sem_init returns ENOSYS).
-  // In that case sem_trywait returns EINVAL which we treat as "not available".
+  // Portable version using sem_trywait with polling (BSD, other Unix)
   uint32_t elapsed        = 0;
   const uint32_t sleep_ms = 1; // Sleep 1ms between attempts
 
@@ -323,7 +327,7 @@ vscp_sem_wait(sem_t *sem, uint32_t waitms)
       return 0; // Successfully acquired semaphore
     }
 
-    if (errno != EAGAIN && errno != EINVAL) {
+    if (errno != EAGAIN) {
       return -1; // Real error
     }
 
