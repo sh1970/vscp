@@ -40,6 +40,13 @@ Also there is a <a href="https://github.com/grodansparadis/vscp_firmware"firmwar
 <a href="https://github.com/grodansparadis/vscp_html5">HTML5 websocket UI repository</a>.
 </p>
 
+## License
+
+The whole source code is published under the MIT license. Consider the different licenses of possible third party libraries too!
+
+## Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, shall be licensed as above, without any additional terms or conditions.
 
 Copyright (C) 2000-2026 Ake Hedman, the VSCP project - MIT license.
 

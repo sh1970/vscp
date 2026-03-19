@@ -158,7 +158,7 @@ tcpipListenThread(void* pData)
 
     // CA file
     if (pObj->m_tcpip_ssl_ca_file.length()) {
-        opts.chain = strdup((const char*)pObj->m_tcpip_ssl_ca_file.c_str());
+        opts.ca_file = strdup((const char*)pObj->m_tcpip_ssl_ca_file.c_str());
     }
 
     opts.verify_depth        = pObj->m_tcpip_ssl_verify_depth;
