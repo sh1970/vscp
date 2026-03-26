@@ -824,6 +824,7 @@ struct vscpMyNode {
 #define VSCP_ERROR_INVALID_FORMAT     69 /* Format is wrong. Error in conversion */
 #define VSCP_ERROR_INVALID_CONTEXT    70 /* Context is invalid or missing */
 #define VSCP_ERROR_UNSUPPORTED        71 /* Not supported */
+#define VSCP_ERROR_UNKNOWN_COMMAND    72 /* This command is not available */
 
 /*!
   A timestamp that is less than this value is considered to be an event that should
