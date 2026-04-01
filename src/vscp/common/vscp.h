@@ -46,7 +46,7 @@
 #define VSCP_ADDRESS_SEGMENT_CONTROLLER 0x00
 #define VSCP_ADDRESS_NEW_NODE           0xff
 
-#define VSCP_MAX_DATA  (512) /* was 487 */
+#define VSCP_MAX_DATA  (512)
 #define VSCP_SIZE_GUID (16)  /* GUID array size */
 
 #define VSCP_LEVEL1 0 /* Changed 151104  Was 1/2 */
@@ -246,10 +246,10 @@ typedef vscpEventEx *PVSCPEVENTEX;
 #define VSCP_MASK_HARDCODED 0x10
 #define VSCP_MASK_NOCRCCALC 0x08
 
-#define VSCP_LEVEL1_MAXDATA 8
+#define VSCP_LEVEL1_MAXDATA (8)
 #define VSCP_LEVEL2_MAXDATA (512)
 
-#define VSCP_NOCRC_CALC_DUMMY_CRC 0xAA55 /* If no CRC cal bit is set the CRC value */
+#define VSCP_NOCRC_CALC_DUMMY_CRC 0xAA55 /* If no CRC calc bit is set the CRC value */
                                          /* should be set to this value for the CRC  */
                                          /* calculation to be skipped. */
 
