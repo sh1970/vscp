@@ -1072,7 +1072,7 @@ VscpCanalDeviceIf::CanalDataAvailable()
 int
 VscpCanalDeviceIf::CanalGetStatus(std::string &objStatus, uint8_t nFormat)
 {
-    canalStatus status;
+    canal_status_t status;
 
     // Init must have succeded to do this call
     if (m_hdll == nullptr) {
@@ -1140,7 +1140,7 @@ int
 VscpCanalDeviceIf::CanalGetStatistics( std::string& objStatistics,
                                         uint8_t nFormat)
 {
-    canalStatistics CanalStatistics;
+    canal_statistics_t canal_statistics;
 
     // Init must have succeded to do this call
     if (m_hdll == nullptr) {
@@ -1152,7 +1152,7 @@ VscpCanalDeviceIf::CanalGetStatistics( std::string& objStatistics,
         return CANAL_ERROR_NOT_OPEN;
     }
 
-    int rv = m_proc_CanalGetStatistics(m_openHandle, &CanalStatistics);
+    int rv = m_proc_CanalGetStatistics(m_openHandle, &canal_statistics);
     if (CANAL_ERROR_SUCCESS != rv) {
         return rv;
     }
@@ -1161,25 +1161,25 @@ VscpCanalDeviceIf::CanalGetStatistics( std::string& objStatistics,
     if ( CANAL_FORMAT_CAN_JSON == nFormat ) {
         sprintf( buf,
                     CANAL_STATISTICS_JSON_TEMPLATE,
-                    CanalStatistics.cntReceiveFrames,
-                    CanalStatistics.cntTransmitFrames,
-                    CanalStatistics.cntReceiveData,
-                    CanalStatistics.cntTransmitData,
-                    CanalStatistics.cntTransmitData,
-                    CanalStatistics.cntBusWarnings,
-                    CanalStatistics.cntBusOff );
+                    canal_statistics.cntReceiveFrames,
+                    canal_statistics.cntTransmitFrames,
+                    canal_statistics.cntReceiveData,
+                    canal_statistics.cntTransmitData,
+                    canal_statistics.cntTransmitData,
+                    canal_statistics.cntBusWarnings,
+                    canal_statistics.cntBusOff );
         objStatistics = buf;
     }
     else {  // XML-format for everything else
         sprintf( buf,
                     CANAL_STATISTICS_XML_TEMPLATE,
-                    CanalStatistics.cntReceiveFrames,
-                    CanalStatistics.cntTransmitFrames,
-                    CanalStatistics.cntReceiveData,
-                    CanalStatistics.cntTransmitData,
-                    CanalStatistics.cntTransmitData,
-                    CanalStatistics.cntBusWarnings,
-                    CanalStatistics.cntBusOff );
+                    canal_statistics.cntReceiveFrames,
+                    canal_statistics.cntTransmitFrames,
+                    canal_statistics.cntReceiveData,
+                    canal_statistics.cntTransmitData,
+                    canal_statistics.cntTransmitData,
+                    canal_statistics.cntBusWarnings,
+                    canal_statistics.cntBusOff );
         objStatistics = buf;
     }
 

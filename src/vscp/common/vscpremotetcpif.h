@@ -394,40 +394,40 @@ class VscpRemoteTcpIf
        CANAL_ERROR_FIFO_EMPTY is returned if no event was available.
        CANAL_ERROR_TIMEOUT on timeout.CANAL_ERROR_COMMUNICATION is returned if a
        socket error is detected.
-     */
+    */
     int doCmdBlockingReceive(vscpEvent *pEvent, uint32_t timeout = 500);
 
     int doCmdBlockingReceive(vscpEventEx *pEventEx, uint32_t timeout = 500);
 
     /*!
-        Get the number of events in the input queue of this interface
-        @return the number of events available or if negative
-        an error code.
+      Get the number of events in the input queue of this interface
+      @return the number of events available or if negative
+      an error code.
      */
     int doCmdDataAvailable(void);
 
     /*!
-        Receive CAN status through the interface.
-        @return CANAL_ERROR_SUCCESS on success and error code if failure.
+      Receive CAN status through the interface.
+      @return CANAL_ERROR_SUCCESS on success and error code if failure.
      */
-    int doCmdStatus(canalStatus *pStatus);
+    int doCmdStatus(canal_status_t *pStatus);
 
     /*!
-        A VSCP variant of the above
+      A VSCP variant of the above
      */
-    int doCmdStatus(VSCPStatus *pStatus);
+    int doCmdStatus(vscp_status_t *pStatus);
 
     /*!
-        Receive VSCP statistics through the interface.
-        @return CANAL_ERROR_SUCCESS on success and error code if failure.
+      Receive VSCP statistics through the interface.
+      @return CANAL_ERROR_SUCCESS on success and error code if failure.
      */
-    int doCmdStatistics(VSCPStatistics *pStatistics);
+    int doCmdStatistics(vscp_statistics_t *pStatistics);
 
     /*!
         Receive CAN statistics through the interface.
         @return CANAL_ERROR_SUCCESS on success and error code if failure.
      */
-    int doCmdStatistics(canalStatistics *pStatistics);
+    int doCmdStatistics(canal_statistics_t *pStatistics);
 
     /*!
         Set/Reset a filter through the interface.
@@ -506,7 +506,7 @@ class VscpRemoteTcpIf
         @param pChannelInfo The stucture that will get the information
         @return CANAL_ERROR_SUCCESS on success and error code if failure.
      */
-    int doCmdGetChannelInfo(VSCPChannelInfo *pChannelInfo);
+    int doCmdGetChannelInfo(vscp_channel_info_t *pChannelInfo);
 
     /*!
         Get Channel ID for the open channel

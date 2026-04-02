@@ -1092,7 +1092,7 @@ VscpRemoteTcpIf::doCmdDataAvailable(void)
 //
 
 int
-VscpRemoteTcpIf::doCmdStatus(canalStatus *pStatus)
+VscpRemoteTcpIf::doCmdStatus(canal_status_t *pStatus)
 {
   std::string strBuf;
   std::string strWrk;
@@ -1146,9 +1146,9 @@ VscpRemoteTcpIf::doCmdStatus(canalStatus *pStatus)
 //
 
 int
-VscpRemoteTcpIf::doCmdStatus(VSCPStatus *pStatus)
+VscpRemoteTcpIf::doCmdStatus(vscp_status_t *pStatus)
 {
-  canalStatus status;
+  canal_status_t status;
   int rv = doCmdStatus(&status);
 
   pStatus->channel_status = status.channel_status;
@@ -1164,7 +1164,7 @@ VscpRemoteTcpIf::doCmdStatus(VSCPStatus *pStatus)
 //
 
 int
-VscpRemoteTcpIf::doCmdStatistics(VSCPStatistics *pStatistics)
+VscpRemoteTcpIf::doCmdStatistics(vscp_statistics_t *pStatistics)
 {
   std::string strBuf;
   std::string strWrk;
@@ -1240,16 +1240,16 @@ VscpRemoteTcpIf::doCmdStatistics(VSCPStatistics *pStatistics)
 //
 
 int
-VscpRemoteTcpIf::doCmdStatistics(canalStatistics *pStatistics)
+VscpRemoteTcpIf::doCmdStatistics(canal_statistics_t *pStatistics)
 {
   int rv;
-  VSCPStatistics vscpstat;
+  canal_statistics_t canalstat;
 
   if (NULL == pStatistics) {
     return VSCP_ERROR_PARAMETER;
   }
 
-  if (VSCP_ERROR_SUCCESS != (rv = doCmdStatistics(&vscpstat))) {
+  if (VSCP_ERROR_SUCCESS != (rv = doCmdStatistics(&canalstat))) {
     return rv;
   }
 
@@ -1258,10 +1258,10 @@ VscpRemoteTcpIf::doCmdStatistics(canalStatistics *pStatistics)
   pStatistics->cntBusOff         = 0;
   pStatistics->cntBusWarnings    = 0;
   pStatistics->cntOverruns       = 0;
-  pStatistics->cntReceiveData    = vscpstat.cntReceiveData;
-  pStatistics->cntReceiveFrames  = vscpstat.cntReceiveFrames;
-  pStatistics->cntTransmitData   = vscpstat.cntTransmitData;
-  pStatistics->cntTransmitFrames = vscpstat.cntTransmitFrames;
+  pStatistics->cntReceiveData    = canalstat.cntReceiveData;
+  pStatistics->cntReceiveFrames  = canalstat.cntReceiveFrames;
+  pStatistics->cntTransmitData   = canalstat.cntTransmitData;
+  pStatistics->cntTransmitFrames = canalstat.cntTransmitFrames;
 
   return VSCP_ERROR_SUCCESS;
 }
@@ -1640,7 +1640,7 @@ VscpRemoteTcpIf::doCmdSetGUID(cguid &ifguid)
 //
 
 int
-VscpRemoteTcpIf::doCmdGetChannelInfo(VSCPChannelInfo *pChannelInfo)
+VscpRemoteTcpIf::doCmdGetChannelInfo(vscp_channel_info_t *pChannelInfo)
 {
   int rv;
   std::string strLine;
