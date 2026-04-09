@@ -3099,6 +3099,26 @@ vscp_decryptFrame(uint8_t *output,
                   const uint8_t *iv,
                   uint8_t nAlgorithm);
 
+/*!
+  @fn vscp_setFrameEncryptionUseOpenSSL
+  Select AES backend for vscp_encryptFrame/vscp_decryptFrame.
+
+  Default is false which uses the internal AES implementation.
+
+  @param bEnable Set true to use OpenSSL EVP AES-CBC, false for internal AES.
+*/
+void
+vscp_setFrameEncryptionUseOpenSSL(bool bEnable);
+
+/*!
+  @fn vscp_getFrameEncryptionUseOpenSSL
+  Get current AES backend selection for vscp_encryptFrame/vscp_decryptFrame.
+
+  @return True if OpenSSL backend is selected, false if internal AES is selected.
+*/
+bool
+vscp_getFrameEncryptionUseOpenSSL(void);
+
 ///////////////////////////////////////////////////////////////////////////
 //                         Password/key handling
 ///////////////////////////////////////////////////////////////////////////

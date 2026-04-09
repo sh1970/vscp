@@ -3907,6 +3907,97 @@ TEST(VscpHelper, writeCommandToFrame_large_args)
     }
 }
 
+static size_t runFrameEncryptDecrypt(uint8_t *encrypted,
+                                     uint8_t *decrypted,
+                                     uint8_t *frame,
+                                     size_t plain_len,
+                                     uint8_t *key,
+                                     uint8_t *iv,
+                                     bool useOpenSSL)
+{
+    vscp_setFrameEncryptionUseOpenSSL(useOpenSSL);
+
+    size_t enc_len = vscp_encryptFrame(encrypted,
+                                       frame,
+                                       plain_len,
+                                       key,
+                                       iv,
+                                       VSCP_ENCRYPTION_FROM_TYPE_BYTE);
+    EXPECT_GT(enc_len, 0U);
+    if (!enc_len) {
+        return 0;
+    }
+
+    EXPECT_TRUE(vscp_decryptFrame(decrypted,
+                                  encrypted,
+                                  enc_len,
+                                  key,
+                                  nullptr,
+                                  VSCP_ENCRYPTION_FROM_TYPE_BYTE));
+
+    // Basic frame invariants expected from both backends.
+    EXPECT_EQ(frame[0], encrypted[0]);
+    EXPECT_EQ(frame[0], decrypted[0]);
+    EXPECT_EQ(0, memcmp(encrypted + enc_len - 16, iv, 16));
+
+    return enc_len;
+}
+
+TEST(VscpHelper, frameCryptoBackendSwitch_Aes128RoundtripAndParity)
+{
+    uint8_t key[16] = {
+        0x10, 0x21, 0x32, 0x43, 0x54, 0x65, 0x76, 0x87,
+        0x98, 0xA9, 0xBA, 0xCB, 0xDC, 0xED, 0xFE, 0x0F
+    };
+
+    uint8_t iv[16] = {
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
+        0x10, 0x32, 0x54, 0x76, 0x98, 0xBA, 0xDC, 0xFE
+    };
+
+    // Keep packet buffer larger than plaintext len to match legacy padding read behavior.
+    uint8_t frame[80];
+    memset(frame, 0, sizeof(frame));
+    frame[0] = VSCP_BINARY_PACKET_TYPE_EVENT | VSCP_ENCRYPTION_AES128;
+    for (int i = 1; i < 33; i++) {
+        frame[i] = (uint8_t) i;
+    }
+
+    const size_t plain_len = 33;
+
+    uint8_t enc_internal[128];
+    uint8_t enc_openssl[128];
+    uint8_t dec_internal[128];
+    uint8_t dec_openssl[128];
+    memset(enc_internal, 0, sizeof(enc_internal));
+    memset(enc_openssl, 0, sizeof(enc_openssl));
+    memset(dec_internal, 0, sizeof(dec_internal));
+    memset(dec_openssl, 0, sizeof(dec_openssl));
+
+    size_t enc_len_internal = runFrameEncryptDecrypt(enc_internal,
+                                                     dec_internal,
+                                                     frame,
+                                                     plain_len,
+                                                     key,
+                                                     iv,
+                                                     false);
+
+    size_t enc_len_openssl = runFrameEncryptDecrypt(enc_openssl,
+                                                    dec_openssl,
+                                                    frame,
+                                                    plain_len,
+                                                    key,
+                                                    iv,
+                                                    true);
+
+    // Both backends should produce a valid encrypted frame size.
+    EXPECT_EQ(enc_len_internal, enc_len_openssl);
+    EXPECT_GT(enc_len_internal, plain_len);
+
+    // Restore default behavior for subsequent tests.
+    vscp_setFrameEncryptionUseOpenSSL(false);
+}
+
 // Entry point for Google Test
 int main(int argc, char **argv)
 {

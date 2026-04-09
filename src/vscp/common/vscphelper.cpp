@@ -92,6 +92,7 @@ clock_gettime(int, struct timespec *ts)
 #include <vscphelper.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <chrono>
 #include <deque>
@@ -110,6 +111,8 @@ clock_gettime(int, struct timespec *ts)
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
+
+#include <openssl/evp.h>
 
 #define UNUSED(expr)                                                                                                   \
   do {                                                                                                                 \
@@ -138,6 +141,270 @@ clock_gettime(int, struct timespec *ts)
 #define XML_BUFF_SIZE  0xffff
 
 using namespace std;
+
+static std::atomic<bool> g_vscp_use_openssl_frame_crypto(false);
+
+static const EVP_CIPHER *
+vscp_getOpenSslCipherFromAlgorithm(uint8_t algorithm)
+{
+  switch (algorithm) {
+
+    case VSCP_ENCRYPTION_AES128:
+      return EVP_aes_128_cbc();
+
+    case VSCP_ENCRYPTION_AES192:
+      return EVP_aes_192_cbc();
+
+    case VSCP_ENCRYPTION_AES256:
+      return EVP_aes_256_cbc();
+
+    default:
+      return nullptr;
+  }
+}
+
+static bool
+vscp_validateFrameCryptoPointers(uint8_t *output, uint8_t *input, const uint8_t *key)
+{
+  return (nullptr != output) && (nullptr != input) && (nullptr != key);
+}
+
+static uint8_t
+vscp_resolveFrameCryptoAlgorithm(uint8_t algorithm, const uint8_t *input)
+{
+  if (VSCP_ENCRYPTION_FROM_TYPE_BYTE == (algorithm & 0x0f)) {
+    return input[0] & 0x0f;
+  }
+
+  return algorithm;
+}
+
+static bool
+vscp_getEncryptionIv(uint8_t *target, const uint8_t *iv)
+{
+  if (nullptr == iv) {
+    return (16 == getRandomIV(target, 16));
+  }
+
+  memcpy(target, iv, 16);
+  return true;
+}
+
+static bool
+vscp_validateEvpArgs(const EVP_CIPHER *pcipher,
+                     uint8_t *output,
+                     const uint8_t *input,
+                     const uint8_t *key,
+                     const uint8_t *iv)
+{
+  if (nullptr == pcipher) {
+    return false;
+  }
+
+  if (nullptr == output) {
+    return false;
+  }
+
+  if (nullptr == input) {
+    return false;
+  }
+
+  if (nullptr == key) {
+    return false;
+  }
+
+  if (nullptr == iv) {
+    return false;
+  }
+
+  return true;
+}
+
+static bool
+vscp_evpEncryptBuffer(const EVP_CIPHER *pcipher,
+                      uint8_t *output,
+                      const uint8_t *input,
+                      size_t len,
+                      const uint8_t *key,
+                      const uint8_t *iv)
+{
+  if (!vscp_validateEvpArgs(pcipher, output, input, key, iv)) {
+    return false;
+  }
+
+  EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+  if (nullptr == ctx) {
+    return false;
+  }
+
+  int outlen1 = 0;
+  int outlen2 = 0;
+  if (!EVP_EncryptInit_ex(ctx, pcipher, nullptr, key, iv)) {
+    EVP_CIPHER_CTX_free(ctx);
+    return false;
+  }
+
+  if (!EVP_CIPHER_CTX_set_padding(ctx, 0)) {
+    EVP_CIPHER_CTX_free(ctx);
+    return false;
+  }
+
+  if (!EVP_EncryptUpdate(ctx, output, &outlen1, input, (int) len)) {
+    EVP_CIPHER_CTX_free(ctx);
+    return false;
+  }
+
+  if (!EVP_EncryptFinal_ex(ctx, output + outlen1, &outlen2)) {
+    EVP_CIPHER_CTX_free(ctx);
+    return false;
+  }
+
+  EVP_CIPHER_CTX_free(ctx);
+
+  return (((size_t) outlen1 + (size_t) outlen2) == len);
+}
+
+static bool
+vscp_evpDecryptBuffer(const EVP_CIPHER *pcipher,
+                      uint8_t *output,
+                      const uint8_t *input,
+                      size_t len,
+                      const uint8_t *key,
+                      const uint8_t *iv)
+{
+  if (!vscp_validateEvpArgs(pcipher, output, input, key, iv)) {
+    return false;
+  }
+
+  EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+  if (nullptr == ctx) {
+    return false;
+  }
+
+  int outlen1 = 0;
+  int outlen2 = 0;
+  if (!EVP_DecryptInit_ex(ctx, pcipher, nullptr, key, iv)) {
+    EVP_CIPHER_CTX_free(ctx);
+    return false;
+  }
+
+  if (!EVP_CIPHER_CTX_set_padding(ctx, 0)) {
+    EVP_CIPHER_CTX_free(ctx);
+    return false;
+  }
+
+  if (!EVP_DecryptUpdate(ctx, output, &outlen1, input, (int) len)) {
+    EVP_CIPHER_CTX_free(ctx);
+    return false;
+  }
+
+  if (!EVP_DecryptFinal_ex(ctx, output + outlen1, &outlen2)) {
+    EVP_CIPHER_CTX_free(ctx);
+    return false;
+  }
+
+  EVP_CIPHER_CTX_free(ctx);
+
+  return (0 == outlen2) && (((size_t) outlen1) == len);
+}
+
+static size_t
+vscp_encryptFrameOpenSSL(uint8_t *output,
+                         uint8_t *input,
+                         size_t len,
+                         const uint8_t *key,
+                         const uint8_t *iv,
+                         uint8_t nAlgorithm)
+{
+  uint8_t generated_iv[16];
+
+  if (!vscp_validateFrameCryptoPointers(output, input, key)) {
+    return 0;
+  }
+
+  // If no encryption needed - return
+  if (VSCP_ENCRYPTION_NONE == nAlgorithm) {
+    memcpy(output, input, len);
+    return len;
+  }
+
+  nAlgorithm = vscp_resolveFrameCryptoAlgorithm(nAlgorithm, input);
+
+  const EVP_CIPHER *pcipher = vscp_getOpenSslCipherFromAlgorithm(nAlgorithm);
+  if (nullptr == pcipher) {
+    return 0;
+  }
+
+  // Must pad to full AES blocks.
+  size_t padlen = len + (16 - (len % 16));
+
+  // The packet type is always un-encrypted
+  output[0] = input[0];
+
+  if (!vscp_getEncryptionIv(generated_iv, iv)) {
+    return 0;
+  }
+
+  std::vector<uint8_t> plaintext(padlen, 0);
+  if (len > 1) {
+    memcpy(plaintext.data(), input + 1, MIN((size_t) (len - 1), padlen));
+  }
+
+  if (!vscp_evpEncryptBuffer(pcipher, output + 1, plaintext.data(), padlen, key, generated_iv)) {
+    return 0;
+  }
+
+  // Append iv
+  memcpy(output + 1 + padlen, generated_iv, 16);
+  padlen += 16;
+
+  return padlen + 1; // Count packet type byte
+}
+
+static bool
+vscp_decryptFrameOpenSSL(uint8_t *output,
+                         uint8_t *input,
+                         size_t len,
+                         const uint8_t *key,
+                         const uint8_t *iv,
+                         uint8_t nAlgorithm)
+{
+  uint8_t appended_iv[16];
+  size_t real_len = len;
+
+  if (!vscp_validateFrameCryptoPointers(output, input, key)) {
+    return false;
+  }
+
+  if (VSCP_ENCRYPTION_NONE == GET_VSCP_BINARY_PACKET_ENCRYPTION(nAlgorithm)) {
+    memcpy(output, input, len);
+    return true;
+  }
+
+  // If iv is not given it should be fetched from the end of input
+  if (nullptr == iv) {
+    if (len < 16) {
+      return false;
+    }
+    memcpy(appended_iv, (input + len - 16), 16);
+    real_len -= 16;
+  }
+  else {
+    memcpy(appended_iv, iv, 16);
+  }
+
+  // Preserve packet type which always is un-encrypted
+  output[0] = input[0];
+
+  nAlgorithm = vscp_resolveFrameCryptoAlgorithm(nAlgorithm, input);
+
+  const EVP_CIPHER *pcipher = vscp_getOpenSslCipherFromAlgorithm(nAlgorithm);
+  if (nullptr == pcipher) {
+    return false;
+  }
+
+  return vscp_evpDecryptBuffer(pcipher, output + 1, input + 1, real_len - 1, key, appended_iv);
+}
 
 // https://github.com/nlohmann/json
 using json = nlohmann::json;
@@ -8521,6 +8788,26 @@ vscp_getBootLoaderDescription(uint8_t code)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// vscp_setFrameEncryptionUseOpenSSL
+//
+
+void
+vscp_setFrameEncryptionUseOpenSSL(bool bEnable)
+{
+  g_vscp_use_openssl_frame_crypto.store(bEnable);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// vscp_getFrameEncryptionUseOpenSSL
+//
+
+bool
+vscp_getFrameEncryptionUseOpenSSL(void)
+{
+  return g_vscp_use_openssl_frame_crypto.load();
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // vscp_encryptFrame
 //
 
@@ -8532,6 +8819,10 @@ vscp_encryptFrame(uint8_t *output,
                   const uint8_t *iv,
                   uint8_t nAlgorithm)
 {
+  if (vscp_getFrameEncryptionUseOpenSSL()) {
+    return vscp_encryptFrameOpenSSL(output, input, len, key, iv, nAlgorithm);
+  }
+
   uint8_t generated_iv[16];
 
   // Check pointers
@@ -8638,6 +8929,10 @@ vscp_decryptFrame(uint8_t *output,
                   const uint8_t *iv,
                   uint8_t nAlgorithm)
 {
+  if (vscp_getFrameEncryptionUseOpenSSL()) {
+    return vscp_decryptFrameOpenSSL(output, input, len, key, iv, nAlgorithm);
+  }
+
   uint8_t appended_iv[16];
   size_t real_len = len;
 
