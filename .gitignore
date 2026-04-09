@@ -324,3 +324,7 @@ src/vscp/relayd/relayd
 tests/helperlib/unittest
 googletest
 build
+
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
