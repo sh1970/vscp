@@ -5335,10 +5335,41 @@ vscp_convertJSONToEvent(vscpEvent *pEvent, std::string &strJSON)
   try {
     auto j = json::parse(strJSON);
 
+    auto get_numeric_key = [&j](const char *primary, const char *legacy) -> const char * {
+      if (j.contains(primary)) {
+        return primary;
+      }
+      if (j.contains(legacy)) {
+        return legacy;
+      }
+      return nullptr;
+    };
+
+    auto get_string_key = [&j](const char *primary, const char *legacy) -> const char * {
+      if (j.contains(primary)) {
+        return primary;
+      }
+      if (j.contains(legacy)) {
+        return legacy;
+      }
+      return nullptr;
+    };
+
+    auto get_array_key = [&j](const char *primary, const char *legacy) -> const char * {
+      if (j.contains(primary)) {
+        return primary;
+      }
+      if (j.contains(legacy)) {
+        return legacy;
+      }
+      return nullptr;
+    };
+
     // head - read from JSON but we'll set frame version to UNIX_NS
     pEvent->head = 0;
-    if (j.contains("head") && j["head"].is_number_unsigned()) {
-      pEvent->head = j.at("head").get<uint16_t>();
+    const char *head_key = get_numeric_key("head", "vscpHead");
+    if ((nullptr != head_key) && j[head_key].is_number_unsigned()) {
+      pEvent->head = j.at(head_key).get<uint16_t>();
     }
     // Always set frame version to UNIX_NS
     pEvent->head = (pEvent->head & ~VSCP_HEADER16_FRAME_VERSION_MASK) | VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
@@ -5364,29 +5395,34 @@ vscp_convertJSONToEvent(vscpEvent *pEvent, std::string &strJSON)
       }
     }
     // If no timestamp_ns, check for datetime + timestamp (old format) and convert
-    else if (j.contains("datetime") && j["datetime"].is_string()) {
-      std::string dtStr = j.at("datetime").get<std::string>();
-      struct tm tm;
-      memset(&tm, 0, sizeof(tm));
-      if (vscp_parseISOCombined(&tm, dtStr)) {
-        time_t t             = timegm(&tm);
-        pEvent->timestamp_ns = (uint64_t) t * 1000000000ULL;
-        // Add microsecond timestamp if present
-        if (j.contains("timestamp") && j["timestamp"].is_number_unsigned()) {
-          uint32_t usTimestamp = j.at("timestamp").get<uint32_t>();
-          pEvent->timestamp_ns += (uint64_t) usTimestamp * 1000ULL;
+    else {
+      const char *datetime_key  = get_string_key("datetime", "vscpDateTime");
+      const char *timestamp_key = get_numeric_key("timestamp", "vscpTimeStamp");
+
+      if ((nullptr != datetime_key) && j[datetime_key].is_string()) {
+        std::string dtStr = j.at(datetime_key).get<std::string>();
+        struct tm tm;
+        memset(&tm, 0, sizeof(tm));
+        if (vscp_parseISOCombined(&tm, dtStr)) {
+          time_t t             = timegm(&tm);
+          pEvent->timestamp_ns = (uint64_t) t * 1000000000ULL;
+          // Add microsecond timestamp if present
+          if ((nullptr != timestamp_key) && j[timestamp_key].is_number_unsigned()) {
+            uint32_t usTimestamp = j.at(timestamp_key).get<uint32_t>();
+            pEvent->timestamp_ns += (uint64_t) usTimestamp * 1000ULL;
+          }
         }
       }
-    }
-    // Fallback: use timestamp field as nanoseconds if it looks like one
-    else if (j.contains("timestamp") && j["timestamp"].is_number_unsigned()) {
-      uint64_t ts = j.at("timestamp").get<uint64_t>();
-      // If > 10^12, assume it's nanoseconds; otherwise assume microseconds
-      if (ts > 1000000000000ULL) {
-        pEvent->timestamp_ns = ts;
-      }
-      else {
-        pEvent->timestamp_ns = ts * 1000ULL;
+      // Fallback: use timestamp field as nanoseconds if it looks like one
+      else if ((nullptr != timestamp_key) && j[timestamp_key].is_number_unsigned()) {
+        uint64_t ts = j.at(timestamp_key).get<uint64_t>();
+        // If > 10^12, assume it's nanoseconds; otherwise assume microseconds
+        if (ts > 1000000000000ULL) {
+          pEvent->timestamp_ns = ts;
+        }
+        else {
+          pEvent->timestamp_ns = ts * 1000ULL;
+        }
       }
     }
 
@@ -5403,20 +5439,23 @@ vscp_convertJSONToEvent(vscpEvent *pEvent, std::string &strJSON)
 
     // VSCP class
     pEvent->vscp_class = 0;
-    if (j.contains("class") && j["class"].is_number_unsigned()) {
-      pEvent->vscp_class = j.at("class").get<uint16_t>();
+    const char *class_key = get_numeric_key("class", "vscpClass");
+    if ((nullptr != class_key) && j[class_key].is_number_unsigned()) {
+      pEvent->vscp_class = j.at(class_key).get<uint16_t>();
     }
 
     // VSCP type
     pEvent->vscp_type = 0;
-    if (j.contains("type") && j["type"].is_number_unsigned()) {
-      pEvent->vscp_type = j.at("type").get<uint16_t>();
+    const char *type_key = get_numeric_key("type", "vscpType");
+    if ((nullptr != type_key) && j[type_key].is_number_unsigned()) {
+      pEvent->vscp_type = j.at(type_key).get<uint16_t>();
     }
 
     // GUID
     memset(pEvent->GUID, 0, 16);
-    if (j.contains("guid") && j["guid"].is_string()) {
-      std::string guidStr = j.at("guid").get<std::string>();
+    const char *guid_key = get_string_key("guid", "vscpGuid");
+    if ((nullptr != guid_key) && j[guid_key].is_string()) {
+      std::string guidStr = j.at(guid_key).get<std::string>();
       cguid guid;
       guid.getFromString(guidStr);
       guid.writeGUID(pEvent->GUID);
@@ -5424,8 +5463,9 @@ vscp_convertJSONToEvent(vscpEvent *pEvent, std::string &strJSON)
 
     pEvent->sizeData = 0;
     pEvent->pdata    = nullptr;
-    if (j.contains("data") && j["data"].is_array()) {
-      std::vector<std::uint8_t> data_array = j.at("data");
+    const char *data_key = get_array_key("data", "vscpData");
+    if ((nullptr != data_key) && j[data_key].is_array()) {
+      std::vector<std::uint8_t> data_array = j.at(data_key);
       // Check size
       if (data_array.size() > VSCP_MAX_DATA) {
         return false;
@@ -5563,10 +5603,41 @@ vscp_convertJSONToEventEx(vscpEventEx *pEventEx, std::string &strJSON)
 
     auto j = json::parse(strJSON);
 
+    auto get_numeric_key = [&j](const char *primary, const char *legacy) -> const char * {
+      if (j.contains(primary)) {
+        return primary;
+      }
+      if (j.contains(legacy)) {
+        return legacy;
+      }
+      return nullptr;
+    };
+
+    auto get_string_key = [&j](const char *primary, const char *legacy) -> const char * {
+      if (j.contains(primary)) {
+        return primary;
+      }
+      if (j.contains(legacy)) {
+        return legacy;
+      }
+      return nullptr;
+    };
+
+    auto get_array_key = [&j](const char *primary, const char *legacy) -> const char * {
+      if (j.contains(primary)) {
+        return primary;
+      }
+      if (j.contains(legacy)) {
+        return legacy;
+      }
+      return nullptr;
+    };
+
     // Head - read from JSON but we'll set frame version to UNIX_NS
     pEventEx->head = 0;
-    if (j.contains("head") && j["head"].is_number_unsigned()) {
-      pEventEx->head = j.at("head").get<uint16_t>();
+    const char *head_key = get_numeric_key("head", "vscpHead");
+    if ((nullptr != head_key) && j[head_key].is_number_unsigned()) {
+      pEventEx->head = j.at(head_key).get<uint16_t>();
     }
     // Always set frame version to UNIX_NS
     pEventEx->head = (pEventEx->head & ~VSCP_HEADER16_FRAME_VERSION_MASK) | VSCP_HEADER16_FRAME_VERSION_UNIX_NS;
@@ -5592,29 +5663,34 @@ vscp_convertJSONToEventEx(vscpEventEx *pEventEx, std::string &strJSON)
       }
     }
     // If no timestamp_ns, check for datetime + timestamp (old format) and convert
-    else if (j.contains("datetime") && j["datetime"].is_string()) {
-      std::string dtStr = j.at("datetime").get<std::string>();
-      struct tm tm;
-      memset(&tm, 0, sizeof(tm));
-      if (vscp_parseISOCombined(&tm, dtStr)) {
-        time_t t               = timegm(&tm);
-        pEventEx->timestamp_ns = (uint64_t) t * 1000000000ULL;
-        // Add microsecond timestamp if present
-        if (j.contains("timestamp") && j["timestamp"].is_number_unsigned()) {
-          uint32_t usTimestamp = j.at("timestamp").get<uint32_t>();
-          pEventEx->timestamp_ns += (uint64_t) usTimestamp * 1000ULL;
+    else {
+      const char *datetime_key  = get_string_key("datetime", "vscpDateTime");
+      const char *timestamp_key = get_numeric_key("timestamp", "vscpTimeStamp");
+
+      if ((nullptr != datetime_key) && j[datetime_key].is_string()) {
+        std::string dtStr = j.at(datetime_key).get<std::string>();
+        struct tm tm;
+        memset(&tm, 0, sizeof(tm));
+        if (vscp_parseISOCombined(&tm, dtStr)) {
+          time_t t               = timegm(&tm);
+          pEventEx->timestamp_ns = (uint64_t) t * 1000000000ULL;
+          // Add microsecond timestamp if present
+          if ((nullptr != timestamp_key) && j[timestamp_key].is_number_unsigned()) {
+            uint32_t usTimestamp = j.at(timestamp_key).get<uint32_t>();
+            pEventEx->timestamp_ns += (uint64_t) usTimestamp * 1000ULL;
+          }
         }
       }
-    }
-    // Fallback: use timestamp field as nanoseconds if it looks like one
-    else if (j.contains("timestamp") && j["timestamp"].is_number_unsigned()) {
-      uint64_t ts = j.at("timestamp").get<uint64_t>();
-      // If > 10^12, assume it's nanoseconds; otherwise assume microseconds
-      if (ts > 1000000000000ULL) {
-        pEventEx->timestamp_ns = ts;
-      }
-      else {
-        pEventEx->timestamp_ns = ts * 1000ULL;
+      // Fallback: use timestamp field as nanoseconds if it looks like one
+      else if ((nullptr != timestamp_key) && j[timestamp_key].is_number_unsigned()) {
+        uint64_t ts = j.at(timestamp_key).get<uint64_t>();
+        // If > 10^12, assume it's nanoseconds; otherwise assume microseconds
+        if (ts > 1000000000000ULL) {
+          pEventEx->timestamp_ns = ts;
+        }
+        else {
+          pEventEx->timestamp_ns = ts * 1000ULL;
+        }
       }
     }
 
@@ -5631,28 +5707,32 @@ vscp_convertJSONToEventEx(vscpEventEx *pEventEx, std::string &strJSON)
 
     // VSCP class
     pEventEx->vscp_class = 0;
-    if (j.contains("class") && j["class"].is_number_unsigned()) {
-      pEventEx->vscp_class = j.at("class").get<uint16_t>();
+    const char *class_key = get_numeric_key("class", "vscpClass");
+    if ((nullptr != class_key) && j[class_key].is_number_unsigned()) {
+      pEventEx->vscp_class = j.at(class_key).get<uint16_t>();
     }
 
     // VSCP type
     pEventEx->vscp_type = 0;
-    if (j.contains("type") && j["type"].is_number_unsigned()) {
-      pEventEx->vscp_type = j.at("type").get<uint16_t>();
+    const char *type_key = get_numeric_key("type", "vscpType");
+    if ((nullptr != type_key) && j[type_key].is_number_unsigned()) {
+      pEventEx->vscp_type = j.at(type_key).get<uint16_t>();
     }
 
     // GUID
     memset(pEventEx->GUID, 0, 16);
-    if (j.contains("guid") && j["guid"].is_string()) {
-      std::string guidStr = j.at("guid").get<std::string>();
+    const char *guid_key = get_string_key("guid", "vscpGuid");
+    if ((nullptr != guid_key) && j[guid_key].is_string()) {
+      std::string guidStr = j.at(guid_key).get<std::string>();
       cguid guid;
       guid.getFromString(guidStr);
       guid.writeGUID(pEventEx->GUID);
     }
 
     pEventEx->sizeData = 0;
-    if (j.contains("data") && j["data"].is_array()) {
-      std::vector<std::uint8_t> data_array = j.at("data");
+    const char *data_key = get_array_key("data", "vscpData");
+    if ((nullptr != data_key) && j[data_key].is_array()) {
+      std::vector<std::uint8_t> data_array = j.at(data_key);
 
       // Check size
       if (data_array.size() > VSCP_MAX_DATA) {

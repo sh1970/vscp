@@ -1825,6 +1825,43 @@ TEST(VscpHelper, convertJSONToEvent_UnixNsFrame)
     vscp_deleteEvent(&event);
 }
 
+TEST(VscpHelper, convertJSONToEvent_LegacyVscpKeys)
+{
+    std::string strJSON = R"({
+        "vscpHead": 263,
+        "obid": 77,
+        "vscpDateTime": "2026-03-12T14:30:45Z",
+        "vscpTimeStamp": 123456,
+        "vscpClass": 1040,
+        "vscpType": 6,
+        "vscpGuid": "00:00:00:00:00:00:00:00:00:00:00:00:00:01:00:02",
+        "vscpData": [1, 2, 3, 4]
+    })";
+
+    vscpEvent event;
+    memset(&event, 0, sizeof(event));
+    event.pdata = nullptr;
+
+    EXPECT_TRUE(vscp_convertJSONToEvent(&event, strJSON));
+
+    EXPECT_EQ(263, event.head);
+    EXPECT_EQ(77, event.obid);
+    EXPECT_GT(event.timestamp_ns, 1700000000000000000ULL);
+    EXPECT_LT(event.timestamp_ns, 2000000000000000000ULL);
+    EXPECT_EQ(0xffff, event.year);
+    EXPECT_EQ(0xff, event.month);
+    EXPECT_EQ(1040, event.vscp_class);
+    EXPECT_EQ(6, event.vscp_type);
+    EXPECT_EQ(4, event.sizeData);
+    ASSERT_NE(nullptr, event.pdata);
+    EXPECT_EQ(0x01, event.pdata[0]);
+    EXPECT_EQ(0x02, event.pdata[1]);
+    EXPECT_EQ(0x03, event.pdata[2]);
+    EXPECT_EQ(0x04, event.pdata[3]);
+
+    vscp_deleteEvent(&event);
+}
+
 TEST(VscpHelper, convertJSONToEventEx_OriginalFrame)
 {
     // Even with old-format JSON (datetime + timestamp), output is always frame type 1
@@ -1885,6 +1922,38 @@ TEST(VscpHelper, convertJSONToEventEx_UnixNsFrame)
     EXPECT_EQ(1234567890123456789ULL, eventEx.timestamp_ns);
     EXPECT_EQ(0xffff, eventEx.year);  // Should be set to 0xffff for UNIX_NS
     EXPECT_EQ(0xff, eventEx.month);   // Should be set to 0xff for UNIX_NS
+    EXPECT_EQ(20, eventEx.vscp_class);
+    EXPECT_EQ(10, eventEx.vscp_type);
+    EXPECT_EQ(3, eventEx.sizeData);
+    EXPECT_EQ(0x33, eventEx.data[0]);
+    EXPECT_EQ(0x44, eventEx.data[1]);
+    EXPECT_EQ(0x55, eventEx.data[2]);
+}
+
+TEST(VscpHelper, convertJSONToEventEx_LegacyVscpKeys)
+{
+    std::string strJSON = R"({
+        "vscpHead": 263,
+        "obid": 88,
+        "vscpDateTime": "2026-03-12T14:30:45Z",
+        "vscpTimeStamp": 654321,
+        "vscpClass": 20,
+        "vscpType": 10,
+        "vscpGuid": "00:00:00:00:00:00:00:00:00:00:00:00:00:01:00:02",
+        "vscpData": [51, 68, 85]
+    })";
+
+    vscpEventEx eventEx;
+    memset(&eventEx, 0, sizeof(eventEx));
+
+    EXPECT_TRUE(vscp_convertJSONToEventEx(&eventEx, strJSON));
+
+    EXPECT_EQ(263, eventEx.head);
+    EXPECT_EQ(88, eventEx.obid);
+    EXPECT_GT(eventEx.timestamp_ns, 1700000000000000000ULL);
+    EXPECT_LT(eventEx.timestamp_ns, 2000000000000000000ULL);
+    EXPECT_EQ(0xffff, eventEx.year);
+    EXPECT_EQ(0xff, eventEx.month);
     EXPECT_EQ(20, eventEx.vscp_class);
     EXPECT_EQ(10, eventEx.vscp_type);
     EXPECT_EQ(3, eventEx.sizeData);
