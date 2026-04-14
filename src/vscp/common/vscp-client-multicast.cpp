@@ -363,7 +363,7 @@ vscpClientMulticast::connect(void)
 
   // Set TTL (time to live)
   unsigned char ttl = m_ttl;
-  if (setsockopt(m_sock, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) < 0) {
+  if (setsockopt(m_sock, IPPROTO_IP, IP_MULTICAST_TTL, reinterpret_cast<const char *>(&ttl), sizeof(ttl)) < 0) {
     perror("setsockopt (IP_MULTICAST_TTL)");
     close(m_sock);
     return VSCP_ERROR_PARAMETER;
@@ -371,7 +371,11 @@ vscpClientMulticast::connect(void)
 
   // Allow broadcast (for UDP)
   int broadcastPermission = 1; // 0 = disable, 1 = enable
-  if (setsockopt(m_sock, SOL_SOCKET, SO_BROADCAST, &broadcastPermission, sizeof(broadcastPermission)) < 0) {
+  if (setsockopt(m_sock,
+                 SOL_SOCKET,
+                 SO_BROADCAST,
+                 reinterpret_cast<const char *>(&broadcastPermission),
+                 sizeof(broadcastPermission)) < 0) {
     perror("setsockopt failed");
     close(m_sock);
     return VSCP_ERROR_PARAMETER;
@@ -383,7 +387,7 @@ vscpClientMulticast::connect(void)
     This is also true for other programs running on the host.
   */
   unsigned char loop = 0; // 0 = disable, 1 = enable
-  if (setsockopt(m_sock, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop)) < 0) {
+  if (setsockopt(m_sock, IPPROTO_IP, IP_MULTICAST_LOOP, reinterpret_cast<const char *>(&loop), sizeof(loop)) < 0) {
     perror("setsockopt IP_MULTICAST_LOOP failed");
     close(m_sock);
     return VSCP_ERROR_PARAMETER;
