@@ -886,7 +886,11 @@ workerThread(vscpClientMulticast *pClient)
   fd_set readfds;
   struct timeval timeout;
   struct sockaddr_in senderAddr;
+#ifdef WIN32
+  int addrLen = sizeof(senderAddr);
+#else
   socklen_t addrLen = sizeof(senderAddr);
+#endif
 
   // Check pointer
   if (nullptr == pClient) {
@@ -918,7 +922,12 @@ workerThread(vscpClientMulticast *pClient)
       if (FD_ISSET(pClient->m_sock, &readfds)) {
 
         pthread_mutex_lock(&pClient->m_mutexSocket);
-        int nReceived = recvfrom(pClient->m_sock, buf, BUFFER_SIZE, 0, (struct sockaddr *) &senderAddr, &addrLen);
+        int nReceived = recvfrom(pClient->m_sock,
+               reinterpret_cast<char *>(buf),
+               BUFFER_SIZE,
+               0,
+               (struct sockaddr *) &senderAddr,
+               &addrLen);
         pthread_mutex_unlock(&pClient->m_mutexSocket);
 
         if (nReceived > 0) {
