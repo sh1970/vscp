@@ -134,6 +134,7 @@ if(WIN32)
     set(VSCP_PTHREAD_TARGET "")
     set(VSCP_WINDOWS_GETOPT_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/src/common/windows/getopt.c)
     set(VSCP_WINDOWS_GETOPT_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/common/windows)
+    set(VSCP_WINDOWS_PCH_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/vscp/daemon)
 
     # vcpkg path handling
     if(DEFINED VCPKG_TARGET_TRIPLET)
@@ -213,7 +214,8 @@ target_link_libraries(vscp_util
 if(WIN32)
     target_include_directories(vscp_util PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/common/windows>
-        $<BUILD_INTERFACE:${VSCP_WINDOWS_GETOPT_INCLUDE_DIR}>)
+        $<BUILD_INTERFACE:${VSCP_WINDOWS_GETOPT_INCLUDE_DIR}>
+        $<BUILD_INTERFACE:${VSCP_WINDOWS_PCH_INCLUDE_DIR}>)
     target_link_libraries(vscp_util PUBLIC ws2_32)
     if(VSCP_PTHREAD_TARGET)
         target_link_libraries(vscp_util PUBLIC ${VSCP_PTHREAD_TARGET})
@@ -276,6 +278,10 @@ endif()
 if(APPLE AND CJSON_INCLUDE_DIR)
     target_include_directories(vscp_common PUBLIC
         $<BUILD_INTERFACE:${CJSON_INCLUDE_DIR}>)
+endif()
+if(WIN32)
+    target_include_directories(vscp_common PUBLIC
+        $<BUILD_INTERFACE:${VSCP_WINDOWS_PCH_INCLUDE_DIR}>)
 endif()
 
 target_compile_definitions(vscp_common PUBLIC ${VSCP_OPENSSL_API_DEF})
