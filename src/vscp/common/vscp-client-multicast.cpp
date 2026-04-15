@@ -521,7 +521,7 @@ vscpClientMulticast::send(vscpEvent &ev)
   multicastAddr.sin_addr.s_addr = inet_addr(m_multicastGroupAddr.c_str());
   multicastAddr.sin_port        = htons(m_multicastPort);
 
-  ssize_t nSent =
+  int nSent =
     sendto(m_sock, (const char *) pframe, framelen, 0, (struct sockaddr *) &multicastAddr, sizeof(multicastAddr));
 
   // Frame buffer not needed anymore
