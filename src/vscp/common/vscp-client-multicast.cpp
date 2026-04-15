@@ -885,7 +885,7 @@ void
 workerThread(vscpClientMulticast *pClient)
 {
   uint8_t buf[BUFFER_SIZE];
-  int rv;
+  int rv = 0;
   fd_set readfds;
   struct timeval timeout;
   struct sockaddr_in senderAddr;
